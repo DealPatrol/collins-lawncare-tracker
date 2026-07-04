@@ -9,6 +9,7 @@ A mobile-friendly lawncare schedule and pay efficiency tracker.
 - 💰 Pay-per-visit tracking with automatic $/hr rate calculation
 - 🗺 Route map view with Google Maps integration
 - 📊 Dashboard with weekly revenue and avg hourly rate
+- 💾 Data backup export/import (Settings)
 
 ## Run Locally
 
