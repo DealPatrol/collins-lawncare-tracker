@@ -1,4 +1,5 @@
 import { useState, useEffect, useRef } from "react";
+import { getCurrentCoords } from "./location.js";
 
 const STORAGE_KEY = "collins_lawncare_jobs";
 const DAY_KEY = "collins_workday";
@@ -151,34 +152,32 @@ export default function LawncareTracker() {
   const saveJobs = (updated) => setJobs(updated);
 
   // ── WORKDAY CONTROLS ──
-  const startWorkday = () => {
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        const wd = { start: Date.now(), startCoords: coords, end: null, date: getTodayKey(), stops: [] };
-        setWorkday(wd);
-      },
-      () => {
-        const wd = { start: Date.now(), startCoords: null, end: null, date: getTodayKey(), stops: [] };
-        setWorkday(wd);
-      }
-    );
+  const startWorkday = async () => {
+    let coords = null;
+    try {
+      coords = await getCurrentCoords();
+    } catch {
+      // Workday can still start without GPS.
+    }
+    setWorkday({
+      start: Date.now(),
+      startCoords: coords,
+      end: null,
+      date: getTodayKey(),
+      stops: [],
+    });
   };
 
-  const endWorkday = () => {
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        const end = Date.now();
-        setWorkday(w => ({ ...w, end, endCoords: coords }));
-        setDayElapsed(w => workday?.start ? Math.floor((end - workday.start) / 1000) : w);
-      },
-      () => {
-        const end = Date.now();
-        setWorkday(w => ({ ...w, end }));
-        setDayElapsed(w => workday?.start ? Math.floor((end - workday.start) / 1000) : w);
-      }
-    );
+  const endWorkday = async () => {
+    let coords = null;
+    try {
+      coords = await getCurrentCoords();
+    } catch {
+      // Workday can still end without GPS.
+    }
+    const end = Date.now();
+    setWorkday(w => ({ ...w, end, endCoords: coords }));
+    setDayElapsed(w => workday?.start ? Math.floor((end - workday.start) / 1000) : w);
   };
 
   const resetWorkday = () => {
@@ -218,13 +217,14 @@ export default function LawncareTracker() {
     setSelectedJob(null);
   };
 
-  const getLocation = (callback) => {
+  const getLocation = async (callback) => {
     setGeoError("");
-    if (!navigator.geolocation) { setGeoError("GPS not supported"); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => callback({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setGeoError("Could not get location")
-    );
+    try {
+      const coords = await getCurrentCoords();
+      callback(coords);
+    } catch {
+      setGeoError("Could not get location");
+    }
   };
 
   const startTimer = (jobId) => {
@@ -823,7 +823,7 @@ export default function LawncareTracker() {
 }
 
 const styles = {
-  page: { background: "#0d1117", minHeight: "100vh", color: "#e2e8f0", fontFamily: "'Inter', system-ui, sans-serif", paddingBottom: 40 },
+  page: { background: "#0d1117", minHeight: "100vh", color: "#e2e8f0", fontFamily: "'Inter', system-ui, sans-serif", paddingBottom: "max(40px, env(safe-area-inset-bottom))" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 16px 12px", borderBottom: "1px solid #1e2a38" },
   brand: { fontSize: 17, fontWeight: 700, color: "#fff", letterSpacing: "-0.3px" },
   subBrand: { fontSize: 10, color: "#64748b", marginTop: 1 },

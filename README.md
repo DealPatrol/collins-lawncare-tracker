@@ -18,8 +18,25 @@ npm install
 npm run dev
 ```
 
+## iOS App Store
+
+This app ships as a native iOS app via Capacitor. See **[APP_STORE.md](./APP_STORE.md)** for the full submission checklist.
+
+Quick start on a Mac:
+
+```bash
+npm install
+npm run build:ios   # build web app + sync to ios/
+npm run ios:open    # open in Xcode
+```
+
+- **Bundle ID:** `com.collins.lawncare`
+- **Privacy policy template:** [docs/PRIVACY_POLICY.md](./docs/PRIVACY_POLICY.md) (host publicly before submitting)
+- **Source assets:** `resources/icon.png`, `resources/splash.png`
+
 ## Built With
 - React + Vite
+- Capacitor (iOS native shell)
 - OpenStreetMap embed
 - Google Maps routing
 - Browser localStorage for data persistence
