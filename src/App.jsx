@@ -1,7 +1,11 @@
 import { useState, useEffect, useRef } from "react";
+import { getCurrentCoords } from "./location.js";
 
 const STORAGE_KEY = "collins_lawncare_jobs";
 const DAY_KEY = "collins_workday";
+const HOME_KEY = "collins_home";
+const HOME_COORDS_KEY = "collins_home_coords";
+const DEFAULT_CENTER = { lat: 34.0632, lng: -86.7686 };
 
 function getWeekKey(date = new Date()) {
   const d = new Date(date);
@@ -40,45 +44,80 @@ function getRateColor(rate) {
   return "#f87171";
 }
 
-// Build an OpenStreetMap URL with markers
-function buildMapUrl(jobs, homeCoords) {
-  // We'll embed an iframe using OpenStreetMap with markers via overpass/nominatim
-  // Use a static map approach with leaflet-like tile display
-  const allCoords = [];
-  if (homeCoords) allCoords.push(homeCoords);
-  jobs.forEach(j => {
-    if (j.coords) allCoords.push(j.coords);
-  });
-  return allCoords;
+function loadJobs() {
+  try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
+  catch { return []; }
+}
+
+function getRunningJob(jobs) {
+  return jobs.find(j => j.currentSessionStart) || null;
+}
+
+function loadWorkday() {
+  try {
+    const wd = JSON.parse(localStorage.getItem(DAY_KEY) || "null");
+    if (wd && wd.date !== getTodayKey()) return null;
+    return wd;
+  }
+  catch { return null; }
+}
+
+function jobRouteLocation(job) {
+  if (job.address) return job.address;
+  if (job.coords) return `${job.coords.lat},${job.coords.lng}`;
+  return null;
+}
+
+function buildMapBounds(jobs, homeCoords) {
+  const coords = [];
+  if (homeCoords) coords.push(homeCoords);
+  jobs.forEach(j => { if (j.coords) coords.push(j.coords); });
+  if (!coords.length) return null;
+  const lats = coords.map(c => c.lat);
+  const lngs = coords.map(c => c.lng);
+  const padding = 0.02;
+  return {
+    centerLat: lats.reduce((a, b) => a + b, 0) / lats.length,
+    centerLng: lngs.reduce((a, b) => a + b, 0) / lngs.length,
+    minLat: Math.min(...lats) - padding,
+    maxLat: Math.max(...lats) + padding,
+    minLng: Math.min(...lngs) - padding,
+    maxLng: Math.max(...lngs) + padding,
+    markerCount: coords.length,
+  };
 }
 
 export default function LawncareTracker() {
-  const [jobs, setJobs] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
-    catch { return []; }
-  });
+  const [jobs, setJobs] = useState(loadJobs);
 
-  // Workday clock state
-  const [workday, setWorkday] = useState(() => {
-    try { return JSON.parse(localStorage.getItem(DAY_KEY) || "null"); }
-    catch { return null; }
-  });
-  const [dayElapsed, setDayElapsed] = useState(0);
-  const dayTimerRef = useRef(null);
+  const [workday, setWorkday] = useState(loadWorkday);
 
   const [view, setView] = useState("dashboard"); // dashboard | add | detail | route | settings
   const [selectedJob, setSelectedJob] = useState(null);
-  const [activeTimer, setActiveTimer] = useState(null);
-  const [elapsed, setElapsed] = useState(0);
-  const [timerStart, setTimerStart] = useState(null);
-  const [locStatus, setLocStatus] = useState("");
-  const timerRef = useRef(null);
+  const runningOnLoad = getRunningJob(loadJobs());
+  const [activeTimer, setActiveTimer] = useState(runningOnLoad?.id ?? null);
+  const [timerStart, setTimerStart] = useState(runningOnLoad?.currentSessionStart ?? null);
+  const [elapsed, setElapsed] = useState(() => {
+    if (!runningOnLoad?.currentSessionStart) return 0;
+    return Math.floor((Date.now() - runningOnLoad.currentSessionStart) / 1000);
+  });
+  const [dayElapsed, setDayElapsed] = useState(() => {
+    const wd = loadWorkday();
+    if (!wd?.start) return 0;
+    const end = wd.end ?? Date.now();
+    return Math.floor((end - wd.start) / 1000);
+  });
+  const [locStatus, setLocStatus] = useState(() => {
+    const loc = runningOnLoad?.currentSessionLoc;
+    return loc ? `📍 ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}` : "";
+  });
+  const importInputRef = useRef(null);
 
   const [form, setForm] = useState({ name: "", address: "", pay: "", notes: "", lat: "", lng: "" });
   const [editingId, setEditingId] = useState(null);
-  const [homeAddress, setHomeAddress] = useState(() => localStorage.getItem("collins_home") || "");
+  const [homeAddress, setHomeAddress] = useState(() => localStorage.getItem(HOME_KEY) || "");
   const [homeCoords, setHomeCoords] = useState(() => {
-    try { return JSON.parse(localStorage.getItem("collins_home_coords") || "null"); }
+    try { return JSON.parse(localStorage.getItem(HOME_COORDS_KEY) || "null"); }
     catch { return null; }
   });
   const [geoError, setGeoError] = useState("");
@@ -93,59 +132,52 @@ export default function LawncareTracker() {
     localStorage.setItem(DAY_KEY, JSON.stringify(workday));
   }, [workday]);
 
-  // Job timer tick
+
   useEffect(() => {
-    if (activeTimer) {
-      timerRef.current = setInterval(() => {
-        setElapsed(Math.floor((Date.now() - timerStart) / 1000));
-      }, 1000);
-    } else {
-      clearInterval(timerRef.current);
-      setElapsed(0);
-    }
-    return () => clearInterval(timerRef.current);
+    if (!activeTimer || !timerStart) return;
+    const id = setInterval(() => {
+      setElapsed(Math.floor((Date.now() - timerStart) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
   }, [activeTimer, timerStart]);
 
-  // Workday timer tick
   useEffect(() => {
-    if (workday?.start && !workday?.end) {
-      dayTimerRef.current = setInterval(() => {
-        setDayElapsed(Math.floor((Date.now() - workday.start) / 1000));
-      }, 1000);
-    } else {
-      clearInterval(dayTimerRef.current);
-      if (workday?.end && workday?.start) {
-        setDayElapsed(Math.floor((workday.end - workday.start) / 1000));
-      }
-    }
-    return () => clearInterval(dayTimerRef.current);
-  }, [workday]);
+    if (!workday?.start || workday?.end) return;
+    const id = setInterval(() => {
+      setDayElapsed(Math.floor((Date.now() - workday.start) / 1000));
+    }, 1000);
+    return () => clearInterval(id);
+  }, [workday?.start, workday?.end]);
 
   const saveJobs = (updated) => setJobs(updated);
 
   // ── WORKDAY CONTROLS ──
-  const startWorkday = () => {
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        const wd = { start: Date.now(), startCoords: coords, end: null, date: getTodayKey(), stops: [] };
-        setWorkday(wd);
-      },
-      () => {
-        const wd = { start: Date.now(), startCoords: null, end: null, date: getTodayKey(), stops: [] };
-        setWorkday(wd);
-      }
-    );
+  const startWorkday = async () => {
+    let coords = null;
+    try {
+      coords = await getCurrentCoords();
+    } catch {
+      // Workday can still start without GPS.
+    }
+    setWorkday({
+      start: Date.now(),
+      startCoords: coords,
+      end: null,
+      date: getTodayKey(),
+      stops: [],
+    });
   };
 
-  const endWorkday = () => {
-    navigator.geolocation?.getCurrentPosition(
-      (pos) => {
-        const coords = { lat: pos.coords.latitude, lng: pos.coords.longitude };
-        setWorkday(w => ({ ...w, end: Date.now(), endCoords: coords }));
-      },
-      () => setWorkday(w => ({ ...w, end: Date.now() }))
-    );
+  const endWorkday = async () => {
+    let coords = null;
+    try {
+      coords = await getCurrentCoords();
+    } catch {
+      // Workday can still end without GPS.
+    }
+    const end = Date.now();
+    setWorkday(w => ({ ...w, end, endCoords: coords }));
+    setDayElapsed(w => workday?.start ? Math.floor((end - workday.start) / 1000) : w);
   };
 
   const resetWorkday = () => {
@@ -185,13 +217,14 @@ export default function LawncareTracker() {
     setSelectedJob(null);
   };
 
-  const getLocation = (callback) => {
+  const getLocation = async (callback) => {
     setGeoError("");
-    if (!navigator.geolocation) { setGeoError("GPS not supported"); return; }
-    navigator.geolocation.getCurrentPosition(
-      (pos) => callback({ lat: pos.coords.latitude, lng: pos.coords.longitude }),
-      () => setGeoError("Could not get location")
-    );
+    try {
+      const coords = await getCurrentCoords();
+      callback(coords);
+    } catch {
+      setGeoError("Could not get location");
+    }
   };
 
   const startTimer = (jobId) => {
@@ -240,6 +273,7 @@ export default function LawncareTracker() {
     ));
     setActiveTimer(null);
     setTimerStart(null);
+    setElapsed(0);
     setLocStatus("");
   };
 
@@ -280,23 +314,19 @@ export default function LawncareTracker() {
 
   // ── ROUTE MAP VIEW ──
   if (view === "route") {
-    const jobsWithCoords = jobs.filter(j => j.coords);
-    // Build OpenStreetMap embed with markers — use a simple iframe
-    // Center on Hanceville AL as default, or average of job coords
-    let centerLat = 34.0632, centerLng = -86.7686;
-    if (homeCoords) { centerLat = homeCoords.lat; centerLng = homeCoords.lng; }
-    else if (jobsWithCoords.length) {
-      centerLat = jobsWithCoords.reduce((a, j) => a + j.coords.lat, 0) / jobsWithCoords.length;
-      centerLng = jobsWithCoords.reduce((a, j) => a + j.coords.lng, 0) / jobsWithCoords.length;
-    }
+    const mapBounds = buildMapBounds(jobs, homeCoords);
+    const centerLat = mapBounds?.centerLat ?? DEFAULT_CENTER.lat;
+    const centerLng = mapBounds?.centerLng ?? DEFAULT_CENTER.lng;
+    const bbox = mapBounds
+      ? `${mapBounds.minLng}%2C${mapBounds.minLat}%2C${mapBounds.maxLng}%2C${mapBounds.maxLat}`
+      : `${centerLng - 0.05}%2C${centerLat - 0.05}%2C${centerLng + 0.05}%2C${centerLat + 0.05}`;
 
-    // Build a URL for Google Maps with all job addresses as waypoints
-    const jobsWithAddr = jobs.filter(j => j.address);
+    const jobsForRouting = jobs.filter(j => jobRouteLocation(j));
     const buildGoogleMapsUrl = () => {
-      if (!jobsWithAddr.length) return null;
-      const origin = homeAddress || "Hanceville, AL";
-      const dest = homeAddress || "Hanceville, AL";
-      const waypoints = jobsWithAddr.map(j => encodeURIComponent(j.address)).join("|");
+      if (!jobsForRouting.length) return null;
+      const origin = homeAddress || (homeCoords ? `${homeCoords.lat},${homeCoords.lng}` : "Hanceville, AL");
+      const dest = homeAddress || (homeCoords ? `${homeCoords.lat},${homeCoords.lng}` : "Hanceville, AL");
+      const waypoints = jobsForRouting.map(j => encodeURIComponent(jobRouteLocation(j))).join("|");
       return `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(origin)}&destination=${encodeURIComponent(dest)}&waypoints=${waypoints}&travelmode=driving`;
     };
 
@@ -375,11 +405,13 @@ export default function LawncareTracker() {
               width="100%"
               height="280"
               style={{ border: "none", display: "block" }}
-              src={`https://www.openstreetmap.org/export/embed.html?bbox=${centerLng - 0.05}%2C${centerLat - 0.05}%2C${centerLng + 0.05}%2C${centerLat + 0.05}&layer=mapnik&marker=${centerLat}%2C${centerLng}`}
+              src={`https://www.openstreetmap.org/export/embed.html?bbox=${bbox}&layer=mapnik&marker=${centerLat}%2C${centerLng}`}
             />
           </div>
           <div style={{ fontSize: 11, color: "#4b5563", textAlign: "center", marginTop: 6 }}>
-            Add addresses to jobs to use the full Google Maps routing above
+            {mapBounds
+              ? `Showing ${mapBounds.markerCount} saved location${mapBounds.markerCount === 1 ? "" : "s"} on the map`
+              : "Add addresses or GPS coords to jobs to use routing and map preview"}
           </div>
         </div>
       </div>
@@ -388,6 +420,59 @@ export default function LawncareTracker() {
 
   // ── SETTINGS ──
   if (view === "settings") {
+    const exportData = () => {
+      const data = {
+        version: 1,
+        exportedAt: new Date().toISOString(),
+        jobs,
+        workday,
+        homeAddress,
+        homeCoords,
+      };
+      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `collins-lawncare-backup-${getTodayKey()}.json`;
+      a.click();
+      URL.revokeObjectURL(url);
+      setGeoError("Backup downloaded!");
+    };
+
+    const importData = (file) => {
+      const reader = new FileReader();
+      reader.onload = (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!Array.isArray(data.jobs)) throw new Error("Invalid backup");
+          setJobs(data.jobs);
+          const restoredWorkday = data.workday?.date === getTodayKey() ? data.workday : null;
+          setWorkday(restoredWorkday);
+          if (data.homeAddress != null) {
+            setHomeAddress(data.homeAddress);
+            localStorage.setItem(HOME_KEY, data.homeAddress);
+          }
+          if (data.homeCoords) {
+            setHomeCoords(data.homeCoords);
+            localStorage.setItem(HOME_COORDS_KEY, JSON.stringify(data.homeCoords));
+          }
+          const running = getRunningJob(data.jobs);
+          setActiveTimer(running?.id ?? null);
+          setTimerStart(running?.currentSessionStart ?? null);
+          setElapsed(running?.currentSessionStart
+            ? Math.floor((Date.now() - running.currentSessionStart) / 1000)
+            : 0);
+          setLocStatus(running?.currentSessionLoc
+            ? `📍 ${running.currentSessionLoc.lat.toFixed(4)}, ${running.currentSessionLoc.lng.toFixed(4)}`
+            : "");
+          setGeoError("Backup restored!");
+        } catch {
+          setGeoError("Could not restore backup — invalid file");
+        }
+      };
+      reader.readAsText(file);
+    };
+
     return (
       <div style={styles.page}>
         <div style={styles.header}>
@@ -402,22 +487,46 @@ export default function LawncareTracker() {
             value={homeAddress}
             onChange={e => setHomeAddress(e.target.value)} />
           <button style={{ ...styles.primaryBtn, marginBottom: 10 }} onClick={() => {
-            localStorage.setItem("collins_home", homeAddress);
+            localStorage.setItem(HOME_KEY, homeAddress);
             setGeoError("Address saved!");
           }}>Save Address</button>
           <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", width: "100%", marginBottom: 0 }}
             onClick={() => getLocation((c) => {
               setHomeCoords(c);
-              localStorage.setItem("collins_home_coords", JSON.stringify(c));
+              localStorage.setItem(HOME_COORDS_KEY, JSON.stringify(c));
               setGeoError(`Home set to ${c.lat.toFixed(4)}, ${c.lng.toFixed(4)}`);
             })}>
             📍 Set Home to Current GPS Location
           </button>
-          {geoError && <div style={{ color: "#4ade80", fontSize: 12, marginTop: 8, textAlign: "center" }}>{geoError}</div>}
           {homeCoords && <div style={{ color: "#64748b", fontSize: 11, marginTop: 6, textAlign: "center" }}>
             Home GPS: {homeCoords.lat.toFixed(4)}, {homeCoords.lng.toFixed(4)}
           </div>}
         </div>
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Data Backup</div>
+          <p style={{ color: "#64748b", fontSize: 12, marginBottom: 12, lineHeight: 1.5 }}>
+            Export your jobs and settings to a file, or restore from a previous backup.
+          </p>
+          <button style={{ ...styles.primaryBtn, marginBottom: 10 }} onClick={exportData}>
+            ⬇ Export Backup
+          </button>
+          <input
+            ref={importInputRef}
+            type="file"
+            accept="application/json,.json"
+            style={{ display: "none" }}
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) importData(file);
+              e.target.value = "";
+            }}
+          />
+          <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", width: "100%", marginBottom: 0 }}
+            onClick={() => importInputRef.current?.click()}>
+            ⬆ Restore from Backup
+          </button>
+        </div>
+        {geoError && <div style={{ color: "#4ade80", fontSize: 12, margin: "0 16px", textAlign: "center" }}>{geoError}</div>}
       </div>
     );
   }
@@ -714,7 +823,7 @@ export default function LawncareTracker() {
 }
 
 const styles = {
-  page: { background: "#0d1117", minHeight: "100vh", color: "#e2e8f0", fontFamily: "'Inter', system-ui, sans-serif", paddingBottom: 40 },
+  page: { background: "#0d1117", minHeight: "100vh", color: "#e2e8f0", fontFamily: "'Inter', system-ui, sans-serif", paddingBottom: "max(40px, env(safe-area-inset-bottom))" },
   header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 16px 12px", borderBottom: "1px solid #1e2a38" },
   brand: { fontSize: 17, fontWeight: 700, color: "#fff", letterSpacing: "-0.3px" },
   subBrand: { fontSize: 10, color: "#64748b", marginTop: 1 },
