@@ -105,6 +105,9 @@ export default function LawncareTracker() {
 
   const [view, setView] = useState("dashboard"); // dashboard | add | detail | route | settings | priority | analytics | invoice
   const [selectedJob, setSelectedJob] = useState(null);
+  const [routeOrder, setRouteOrder] = useState([]);
+  const [invoiceJobId, setInvoiceJobId] = useState(null);
+  const [businessInfo, setBusinessInfo] = useState({ name: "Collins Lawncare", phone: "", address: "" });
   const runningOnLoad = getRunningJob(loadJobs());
   const [activeTimer, setActiveTimer] = useState(runningOnLoad?.id ?? null);
   const [timerStart, setTimerStart] = useState(runningOnLoad?.currentSessionStart ?? null);
@@ -334,7 +337,10 @@ export default function LawncareTracker() {
       return (b.pay || 0) - (a.pay || 0);
     });
 
-    const [routeOrder, setRouteOrder] = useState(jobsWithPriority.map(j => j.id));
+    // Initialize routeOrder from jobs if not already set
+    if (routeOrder.length === 0 && jobsWithPriority.length > 0) {
+      setRouteOrder(jobsWithPriority.map(j => j.id));
+    }
 
     const reorderJobs = (fromIdx, toIdx) => {
       const newOrder = [...routeOrder];
@@ -391,6 +397,269 @@ export default function LawncareTracker() {
 
         <div style={{ padding: "0 16px" }}>
           <button style={styles.primaryBtn} onClick={() => setView("dashboard")}>✓ Start Day</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ANALYTICS DASHBOARD ──
+  if (view === "analytics") {
+    const totalRevenue = jobs.reduce((sum, j) => sum + (j.sessions || []).reduce((s, sess) => s + (sess.pay || 0), 0), 0);
+    const totalHours = jobs.reduce((sum, j) => sum + (j.sessions || []).reduce((s, sess) => s + (sess.duration || 0), 0), 0) / 3600;
+    const avgHourlyRate = totalHours > 0 ? totalRevenue / totalHours : 0;
+    const jobsCompleted = jobs.reduce((sum, j) => sum + (j.sessions || []).length, 0);
+    const avgTimePerJob = jobsCompleted > 0 ? (totalHours * 60) / jobsCompleted : 0;
+    
+    const jobStats = jobs.map(j => {
+      const sessions = j.sessions || [];
+      const revenue = sessions.reduce((s, sess) => s + (sess.pay || 0), 0);
+      const hours = sessions.reduce((s, sess) => s + (sess.duration || 0), 0) / 3600;
+      const rate = hours > 0 ? revenue / hours : 0;
+      return { id: j.id, name: j.name, visits: sessions.length, revenue, hours, rate };
+    }).sort((a, b) => b.revenue - a.revenue);
+
+    const todayRevenue = jobs.reduce((sum, j) => {
+      const today = new Date().toLocaleDateString();
+      return sum + (j.sessions || []).filter(s => s.date === today).reduce((s, sess) => s + (sess.pay || 0), 0);
+    }, 0);
+
+    return (
+      <div style={styles.page}>
+        <div style={styles.header}>
+          <button style={styles.backBtn} onClick={() => setView("dashboard")}>← Back</button>
+          <h1 style={styles.headerTitle}>Analytics</h1>
+          <div style={{ width: 40 }} />
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Overall Performance</div>
+          <div style={styles.statRow}>
+            <div style={styles.stat}>
+              <div style={{ ...styles.statVal, color: "#4ade80" }}>{formatMoney(totalRevenue)}</div>
+              <div style={styles.statLbl}>Total Revenue</div>
+            </div>
+            <div style={styles.stat}>
+              <div style={styles.statVal}>{totalHours.toFixed(1)}h</div>
+              <div style={styles.statLbl}>Total Hours</div>
+            </div>
+            <div style={styles.stat}>
+              <div style={{ ...styles.statVal, color: getRateColor(avgHourlyRate) }}>${avgHourlyRate.toFixed(0)}/hr</div>
+              <div style={styles.statLbl}>Avg Rate</div>
+            </div>
+          </div>
+          <div style={{ marginTop: 16, paddingTop: 16, borderTop: "1px solid #2a2a2a", display: "grid", gridTemplateColumns: "1fr 1fr", gap: 12 }}>
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>Today's Earnings</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#4ade80" }}>{formatMoney(todayRevenue)}</div>
+            </div>
+            <div>
+              <div style={{ fontSize: 12, color: "#64748b" }}>Avg Time/Job</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#00d2ef" }}>{avgTimePerJob.toFixed(0)}m</div>
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Job Performance</div>
+          {jobStats.length === 0 && <div style={styles.empty}>No session data yet</div>}
+          {jobStats.map(stat => (
+            <div key={stat.id} style={{ padding: "12px 0", borderBottom: "1px solid #1e2a38" }}>
+              <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
+                <div style={{ fontWeight: 600 }}>{stat.name}</div>
+                <div style={{ color: "#4ade80", fontWeight: 600 }}>{formatMoney(stat.revenue)}</div>
+              </div>
+              <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 12, fontSize: 12, color: "#64748b" }}>
+                <div>{stat.visits} visit{stat.visits !== 1 ? "s" : ""}</div>
+                <div>{stat.hours.toFixed(1)}h worked</div>
+                <div style={{ color: getRateColor(stat.rate) }}>${stat.rate.toFixed(0)}/hr</div>
+              </div>
+            </div>
+          ))}
+        </div>
+
+        <div style={{ padding: "0 16px" }}>
+          <button style={styles.primaryBtn} onClick={() => setView("dashboard")}>✓ Done</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── INVOICE GENERATION ──
+  if (view === "invoice") {
+    const generateInvoice = (jobId) => {
+      const job = jobs.find(j => j.id === jobId);
+      if (!job) return;
+
+      const sessions = job.sessions || [];
+      const totalMinutes = sessions.reduce((s, sess) => s + (sess.duration || 0), 0) / 60;
+      const totalRevenue = sessions.reduce((s, sess) => s + (sess.pay || 0), 0);
+
+      const html = `
+        <!DOCTYPE html>
+        <html>
+        <head>
+          <meta charset="UTF-8">
+          <title>Invoice - ${job.name}</title>
+          <style>
+            * { margin: 0; padding: 0; box-sizing: border-box; }
+            body { font-family: Arial, sans-serif; color: #333; background: white; }
+            .container { max-width: 800px; margin: 20px auto; padding: 20px; border: 1px solid #ddd; background: #fff; }
+            .header { display: flex; justify-content: space-between; align-items: start; margin-bottom: 30px; border-bottom: 2px solid #333; padding-bottom: 20px; }
+            .company { }
+            .company h1 { font-size: 24px; margin-bottom: 5px; }
+            .company p { font-size: 12px; color: #666; }
+            .invoice-title { text-align: right; }
+            .invoice-title h2 { font-size: 28px; margin-bottom: 10px; color: #00d2ef; }
+            .invoice-title p { font-size: 12px; color: #666; margin: 2px 0; }
+            .details { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
+            .detail-block h3 { font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 8px; font-weight: bold; }
+            .detail-block p { font-size: 14px; margin: 3px 0; line-height: 1.5; }
+            table { width: 100%; border-collapse: collapse; margin-bottom: 30px; }
+            th { background: #f5f5f5; padding: 10px; text-align: left; font-weight: bold; font-size: 12px; text-transform: uppercase; color: #333; border-bottom: 1px solid #ddd; }
+            td { padding: 12px 10px; border-bottom: 1px solid #eee; font-size: 14px; }
+            tr:last-child td { border-bottom: 2px solid #333; }
+            .total-row { display: grid; grid-template-columns: 1fr 150px; gap: 20px; justify-items: end; margin-bottom: 30px; }
+            .total-row div { font-size: 14px; }
+            .total-row .label { text-align: right; }
+            .total-row .amount { font-weight: bold; font-size: 18px; color: #00d2ef; }
+            .notes { background: #f9f9f9; padding: 15px; border-radius: 4px; font-size: 12px; line-height: 1.5; color: #666; margin-bottom: 20px; }
+            .footer { text-align: center; font-size: 11px; color: #999; border-top: 1px solid #ddd; padding-top: 15px; }
+            @media print { body { background: white; } .container { border: none; box-shadow: none; } }
+          </style>
+        </head>
+        <body>
+          <div class="container">
+            <div class="header">
+              <div class="company">
+                <h1>${businessInfo.name}</h1>
+                ${businessInfo.phone ? `<p>📞 ${businessInfo.phone}</p>` : ""}
+                ${businessInfo.address ? `<p>📍 ${businessInfo.address}</p>` : ""}
+              </div>
+              <div class="invoice-title">
+                <h2>INVOICE</h2>
+                <p>Invoice Date: ${new Date().toLocaleDateString()}</p>
+                <p>Invoice #: ${job.id.substring(0, 8).toUpperCase()}</p>
+              </div>
+            </div>
+
+            <div class="details">
+              <div class="detail-block">
+                <h3>Bill To</h3>
+                <p><strong>${job.clientName || job.name}</strong></p>
+                ${job.clientPhone ? `<p>📞 ${job.clientPhone}</p>` : ""}
+                ${job.address ? `<p>📍 ${job.address}</p>` : ""}
+              </div>
+              <div class="detail-block">
+                <h3>Service Details</h3>
+                <p><strong>${job.name}</strong></p>
+                <p>${sessions.length} visit${sessions.length !== 1 ? "s" : ""}</p>
+                <p>Total Time: ${totalMinutes.toFixed(1)} minutes</p>
+              </div>
+            </div>
+
+            <table>
+              <thead>
+                <tr>
+                  <th>Date</th>
+                  <th>Duration</th>
+                  <th>Amount</th>
+                </tr>
+              </thead>
+              <tbody>
+                ${sessions.map(s => `
+                  <tr>
+                    <td>${s.date}</td>
+                    <td>${formatDuration(s.duration)}</td>
+                    <td>$${(s.pay || 0).toFixed(2)}</td>
+                  </tr>
+                `).join("")}
+              </tbody>
+            </table>
+
+            <div class="total-row">
+              <div class="label">TOTAL DUE:</div>
+              <div class="amount">$${totalRevenue.toFixed(2)}</div>
+            </div>
+
+            ${job.notes ? `<div class="notes"><strong>Notes:</strong> ${job.notes}</div>` : ""}
+            ${job.completionNotes ? `<div class="notes"><strong>Completion Notes:</strong> ${job.completionNotes}</div>` : ""}
+
+            <div class="footer">
+              <p>Thank you for your business!</p>
+              <p style="margin-top: 10px; font-size: 10px;">Generated on ${new Date().toLocaleString()}</p>
+            </div>
+          </div>
+        </body>
+        </html>
+      `;
+
+      const printWindow = window.open("", "", "width=800,height=600");
+      if (printWindow) {
+        printWindow.document.write(html);
+        printWindow.document.close();
+        setTimeout(() => printWindow.print(), 250);
+      }
+    };
+
+    if (invoiceJobId) {
+      generateInvoice(invoiceJobId);
+      setInvoiceJobId(null);
+    }
+
+    return (
+      <div style={styles.page}>
+        <div style={styles.header}>
+          <button style={styles.backBtn} onClick={() => setView("dashboard")}>← Back</button>
+          <h1 style={styles.headerTitle}>Invoices</h1>
+          <div style={{ width: 40 }} />
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Business Information</div>
+          <label style={styles.label}>Business Name</label>
+          <input style={styles.input} placeholder="Collins Lawncare" value={businessInfo.name}
+            onChange={e => setBusinessInfo(b => ({ ...b, name: e.target.value }))} />
+          <label style={styles.label}>Phone (optional)</label>
+          <input style={styles.input} placeholder="(256) 555-0100" value={businessInfo.phone}
+            onChange={e => setBusinessInfo(b => ({ ...b, phone: e.target.value }))} />
+          <label style={styles.label}>Address (optional)</label>
+          <input style={styles.input} placeholder="Hanceville, AL" value={businessInfo.address}
+            onChange={e => setBusinessInfo(b => ({ ...b, address: e.target.value }))} />
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Select Job to Invoice</div>
+          {jobs.length === 0 && <div style={styles.empty}>No jobs available</div>}
+          {jobs.filter(j => (j.sessions || []).length > 0).length === 0 ? (
+            <div style={styles.empty}>No jobs with recorded sessions</div>
+          ) : (
+            <div>
+              {jobs.filter(j => (j.sessions || []).length > 0).map(j => {
+                const revenue = (j.sessions || []).reduce((s, sess) => s + (sess.pay || 0), 0);
+                return (
+                  <div key={j.id} style={{ ...styles.jobCard, cursor: "pointer" }} onClick={() => setInvoiceJobId(j.id)}>
+                    <div style={styles.jobCardLeft}>
+                      <div style={styles.jobName}>{j.name}</div>
+                      {j.clientName && <div style={{ color: "#64748b", fontSize: 12 }}>Client: {j.clientName}</div>}
+                      <div style={{ color: "#64748b", fontSize: 11 }}>
+                        {(j.sessions || []).length} session{(j.sessions || []).length !== 1 ? "s" : ""} recorded
+                      </div>
+                    </div>
+                    <div style={styles.jobCardRight}>
+                      <div style={{ color: "#4ade80", fontWeight: 600 }}>{formatMoney(revenue)}</div>
+                      <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", fontSize: 11 }}>
+                        Generate →
+                      </button>
+                    </div>
+                  </div>
+                );
+              })}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "0 16px" }}>
+          <button style={styles.primaryBtn} onClick={() => setView("dashboard")}>← Back to Dashboard</button>
         </div>
       </div>
     );
@@ -754,6 +1023,50 @@ export default function LawncareTracker() {
         </div>
 
         <div style={styles.card}>
+          <div style={styles.sectionTitle}>Completion Evidence</div>
+          <div style={{ marginBottom: 12 }}>
+            <label style={styles.label}>Completion Notes</label>
+            <textarea style={{ ...styles.input, height: 60, resize: "vertical" }} placeholder="Add notes about this job completion..."
+              value={job.completionNotes || ""} onChange={e => {
+                const updated = jobs.map(j => j.id === job.id ? { ...j, completionNotes: e.target.value } : j);
+                saveJobs(updated);
+              }} />
+          </div>
+          <label style={styles.label}>Photos (Base64 embedded)</label>
+          {(job.photos || []).length > 0 && (
+            <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
+              {(job.photos || []).map((photo, idx) => (
+                <div key={idx} style={{ position: "relative", borderRadius: 8, overflow: "hidden", background: "#1e2a38" }}>
+                  <img src={photo} alt={`Photo ${idx + 1}`} style={{ width: "100%", height: 120, objectFit: "cover" }} />
+                  <button style={{ position: "absolute", top: 4, right: 4, background: "#f87171", border: "none", borderRadius: 4, padding: "4px 8px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
+                    onClick={() => {
+                      const updated = jobs.map(j => j.id === job.id ? { ...j, photos: (j.photos || []).filter((_, i) => i !== idx) } : j);
+                      saveJobs(updated);
+                    }}>Remove</button>
+                </div>
+              ))}
+            </div>
+          )}
+          <input type="file" accept="image/*" id="photoInput" style={{ display: "none" }} onChange={e => {
+            if (e.target.files?.[0]) {
+              const reader = new FileReader();
+              reader.onload = (evt) => {
+                const base64 = evt.target?.result;
+                if (typeof base64 === "string") {
+                  const updated = jobs.map(j => j.id === job.id ? { ...j, photos: [...(j.photos || []), base64] } : j);
+                  saveJobs(updated);
+                }
+              };
+              reader.readAsDataURL(e.target.files[0]);
+              e.target.value = "";
+            }
+          }} />
+          <button style={{ ...styles.checkBtn, width: "100%" }} onClick={() => document.getElementById("photoInput").click()}>
+            📸 Add Photo
+          </button>
+        </div>
+
+        <div style={styles.card}>
           <div style={styles.sectionTitle}>Visit History</div>
           {!(job.sessions || []).length && <div style={styles.empty}>No visits recorded yet</div>}
           {[...(job.sessions || [])].reverse().map((s, i) => (
@@ -910,8 +1223,11 @@ export default function LawncareTracker() {
       )}
 
       {/* Bottom nav hint */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 20, padding: "20px 0 8px", borderTop: "1px solid #1e2a38", marginTop: 16 }}>
-        <button style={styles.navBtn} onClick={() => setView("route")}>🗺 Route Map</button>
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "20px 12px 8px", borderTop: "1px solid #1e2a38", marginTop: 16, flexWrap: "wrap" }}>
+        <button style={styles.navBtn} onClick={() => setView("priority")}>📋 Priority</button>
+        <button style={styles.navBtn} onClick={() => setView("route")}>🗺 Route</button>
+        <button style={styles.navBtn} onClick={() => setView("analytics")}>📊 Analytics</button>
+        <button style={styles.navBtn} onClick={() => setView("invoice")}>🧾 Invoice</button>
         <button style={styles.navBtn} onClick={() => setView("settings")}>⚙️ Settings</button>
       </div>
     </div>
