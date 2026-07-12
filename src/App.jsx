@@ -44,6 +44,17 @@ function getRateColor(rate) {
   return "#f87171";
 }
 
+function getPriorityColor(priority) {
+  if (priority === "high") return "#f87171";
+  if (priority === "medium") return "#facc15";
+  return "#60a5fa";
+}
+
+function getPriorityLabel(priority) {
+  const labels = { high: "🔴 High", medium: "🟡 Medium", low: "🔵 Low" };
+  return labels[priority] || "🟡 Medium";
+}
+
 function loadJobs() {
   try { return JSON.parse(localStorage.getItem(STORAGE_KEY) || "[]"); }
   catch { return []; }
@@ -92,7 +103,7 @@ export default function LawncareTracker() {
 
   const [workday, setWorkday] = useState(loadWorkday);
 
-  const [view, setView] = useState("dashboard"); // dashboard | add | detail | route | settings
+  const [view, setView] = useState("dashboard"); // dashboard | add | detail | route | settings | priority | analytics | invoice
   const [selectedJob, setSelectedJob] = useState(null);
   const runningOnLoad = getRunningJob(loadJobs());
   const [activeTimer, setActiveTimer] = useState(runningOnLoad?.id ?? null);
@@ -113,7 +124,7 @@ export default function LawncareTracker() {
   });
   const importInputRef = useRef(null);
 
-  const [form, setForm] = useState({ name: "", address: "", pay: "", notes: "", lat: "", lng: "" });
+  const [form, setForm] = useState({ name: "", address: "", pay: "", notes: "", lat: "", lng: "", priority: "medium", clientName: "", clientPhone: "" });
   const [editingId, setEditingId] = useState(null);
   const [homeAddress, setHomeAddress] = useState(() => localStorage.getItem(HOME_KEY) || "");
   const [homeCoords, setHomeCoords] = useState(() => {
@@ -192,10 +203,11 @@ export default function LawncareTracker() {
     const newJob = {
       id: Date.now().toString(),
       name: form.name, address: form.address, pay: parseFloat(form.pay),
-      notes: form.notes, coords, sessions: [], weeklyMows: {},
+      notes: form.notes, coords, priority: form.priority || "medium", clientName: form.clientName || "", clientPhone: form.clientPhone || "",
+      sessions: [], weeklyMows: {}, photos: [], completionNotes: "",
     };
     saveJobs([...jobs, newJob]);
-    setForm({ name: "", address: "", pay: "", notes: "", lat: "", lng: "" });
+    setForm({ name: "", address: "", pay: "", notes: "", lat: "", lng: "", priority: "medium", clientName: "", clientPhone: "" });
     setView("dashboard");
   };
 
@@ -203,11 +215,11 @@ export default function LawncareTracker() {
     if (!form.name || !form.pay) return;
     const coords = form.lat && form.lng ? { lat: parseFloat(form.lat), lng: parseFloat(form.lng) } : null;
     saveJobs(jobs.map(j => j.id === editingId
-      ? { ...j, name: form.name, address: form.address, pay: parseFloat(form.pay), notes: form.notes, coords: coords || j.coords }
+      ? { ...j, name: form.name, address: form.address, pay: parseFloat(form.pay), notes: form.notes, coords: coords || j.coords, priority: form.priority || "medium", clientName: form.clientName || "", clientPhone: form.clientPhone || "" }
       : j
     ));
     setEditingId(null);
-    setForm({ name: "", address: "", pay: "", notes: "", lat: "", lng: "" });
+    setForm({ name: "", address: "", pay: "", notes: "", lat: "", lng: "", priority: "medium", clientName: "", clientPhone: "" });
     setView("detail");
   };
 
@@ -311,6 +323,78 @@ export default function LawncareTracker() {
   const todayRevenue = workday?.stops
     ? jobs.filter(j => workday.stops.some(s => s.jobId === j.id)).reduce((a, j) => a + j.pay, 0)
     : 0;
+
+  // ── PRIORITY & SMART ROUTING VIEW ──
+  if (view === "priority") {
+    const jobsWithPriority = [...jobs].sort((a, b) => {
+      const priorityOrder = { high: 0, medium: 1, low: 2 };
+      const orderA = priorityOrder[a.priority] ?? 1;
+      const orderB = priorityOrder[b.priority] ?? 1;
+      if (orderA !== orderB) return orderA - orderB;
+      return (b.pay || 0) - (a.pay || 0);
+    });
+
+    const [routeOrder, setRouteOrder] = useState(jobsWithPriority.map(j => j.id));
+
+    const reorderJobs = (fromIdx, toIdx) => {
+      const newOrder = [...routeOrder];
+      const [moved] = newOrder.splice(fromIdx, 1);
+      newOrder.splice(toIdx, 0, moved);
+      setRouteOrder(newOrder);
+    };
+
+    return (
+      <div style={styles.page}>
+        <div style={styles.header}>
+          <button style={styles.backBtn} onClick={() => setView("dashboard")}>← Back</button>
+          <h1 style={styles.headerTitle}>Smart Routing</h1>
+          <div style={{ width: 40 }} />
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Reorder Your Route</div>
+          <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>Drag to adjust order. Sorted by priority and pay.</div>
+          {jobs.length === 0 && <div style={styles.empty}>No jobs added yet</div>}
+          {jobsWithPriority.map((job, idx) => {
+            const orderedIdx = routeOrder.indexOf(job.id);
+            return (
+              <div key={job.id} style={{
+                ...styles.routeJobRow,
+                background: "#0d1117",
+                padding: "12px 10px",
+                marginBottom: 8,
+                borderRadius: 8,
+                borderLeft: `3px solid ${getPriorityColor(job.priority)}`,
+                cursor: "grab"
+              }}>
+                <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", minWidth: 30 }}>#{orderedIdx + 1}</div>
+                <div style={{ flex: 1 }}>
+                  <div style={{ color: "#fff", fontSize: 14, fontWeight: 600 }}>{job.name}</div>
+                  <div style={{ color: "#64748b", fontSize: 11 }}>
+                    {getPriorityLabel(job.priority)} · {formatMoney(job.pay)}
+                  </div>
+                </div>
+                <div style={{ display: "flex", gap: 6 }}>
+                  {orderedIdx > 0 && (
+                    <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", padding: "4px 8px", fontSize: 11 }}
+                      onClick={() => reorderJobs(orderedIdx, orderedIdx - 1)}>↑</button>
+                  )}
+                  {orderedIdx < jobsWithPriority.length - 1 && (
+                    <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", padding: "4px 8px", fontSize: 11 }}
+                      onClick={() => reorderJobs(orderedIdx, orderedIdx + 1)}>↓</button>
+                  )}
+                </div>
+              </div>
+            );
+          })}
+        </div>
+
+        <div style={{ padding: "0 16px" }}>
+          <button style={styles.primaryBtn} onClick={() => setView("dashboard")}>✓ Start Day</button>
+        </div>
+      </div>
+    );
+  }
 
   // ── ROUTE MAP VIEW ──
   if (view === "route") {
@@ -557,6 +641,18 @@ export default function LawncareTracker() {
           <label style={styles.label}>Notes</label>
           <textarea style={{ ...styles.input, height: 70, resize: "vertical" }} placeholder="Gate code, dog, trimming..."
             value={form.notes} onChange={e => setForm(f => ({ ...f, notes: e.target.value }))} />
+          <label style={styles.label}>Priority</label>
+          <select style={styles.input} value={form.priority} onChange={e => setForm(f => ({ ...f, priority: e.target.value }))}>
+            <option value="low">🔵 Low</option>
+            <option value="medium">🟡 Medium</option>
+            <option value="high">🔴 High</option>
+          </select>
+          <label style={styles.label}>Client Name (optional)</label>
+          <input style={styles.input} placeholder="e.g. John Smith" value={form.clientName}
+            onChange={e => setForm(f => ({ ...f, clientName: e.target.value }))} />
+          <label style={styles.label}>Client Phone (optional)</label>
+          <input style={styles.input} placeholder="(256) 555-0123" value={form.clientPhone}
+            onChange={e => setForm(f => ({ ...f, clientPhone: e.target.value }))} />
           <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
             <div>
               <label style={styles.label}>Lat (optional)</label>
@@ -596,7 +692,7 @@ export default function LawncareTracker() {
           <h1 style={styles.headerTitle}>{job.name}</h1>
           <button style={styles.editBtn} onClick={() => {
             setEditingId(job.id);
-            setForm({ name: job.name, address: job.address || "", pay: job.pay, notes: job.notes || "", lat: job.coords?.lat || "", lng: job.coords?.lng || "" });
+            setForm({ name: job.name, address: job.address || "", pay: job.pay, notes: job.notes || "", lat: job.coords?.lat || "", lng: job.coords?.lng || "", priority: job.priority || "medium", clientName: job.clientName || "", clientPhone: job.clientPhone || "" });
           }}>Edit</button>
         </div>
         {job.address && <p style={styles.address}>📍 {job.address}</p>}
