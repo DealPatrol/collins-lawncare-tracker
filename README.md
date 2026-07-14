@@ -1,15 +1,27 @@
 # Collins Lawncare Tracker
 
-A mobile-friendly lawncare schedule and pay efficiency tracker.
+A crew-ready lawncare operations app: GPS-automated time tracking, route planning, and pay efficiency — built for the field.
 
 ## Features
-- 🏠 Workday clock — start when you leave home, stop when you return
-- ⏱ Per-job timers with GPS location logging
-- ✅ Weekly mow checklist (resets every Monday)
-- 💰 Pay-per-visit tracking with automatic $/hr rate calculation
-- 🗺 Route map view with Google Maps integration
-- 📊 Dashboard with weekly revenue and avg hourly rate
-- 💾 Data backup export/import (Settings)
+
+### GPS automation
+- 🎯 **Geofence auto-stop** — the job timer stops and saves itself when the crew drives out of the job site zone (per-job radius, 60–400 m)
+- 📍 **Arrival detection** — pull up to a pinned yard and the app suggests starting the timer
+- 🛣 **Automatic mileage** — an odometer runs while you're clocked in, feeding the crew distance leaderboard
+
+### Crew
+- 👷 Crew profiles (member / manager) — each device tracks hours, stops, and miles to the right person
+- 🏆 Distance leaderboard (today / this week) with yards, mower time, and earnings per member
+- 📋 Live "Today's Activity" view for crew managers
+
+### Planning & money
+- 🗺 **Route Planner** — optimized stop order (nearest-neighbor + 2-opt), per-leg drive estimates, rolling ETAs, and one-tap Google Maps navigation
+- 🌦 Weather on the dashboard with rain-window warnings (Open-Meteo, no API key)
+- ⏱ Per-job timers, weekly mow checklist (resets every Monday), $/hr rate scoring
+- 📊 Workday clock, 7-day earnings chart, weekly revenue
+- 💾 Data backup export/import (Settings) — also used to merge data between crew devices
+
+> **Note:** GPS tracking runs while the app is open (foreground). True background geofencing on iOS requires a background-location entitlement and is a good next step.
 
 ## Run Locally
 
