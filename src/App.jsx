@@ -302,7 +302,7 @@ export default function App() {
     <div className="app">
       {toast && (
         <div style={{ position: "fixed", top: "calc(10px + env(safe-area-inset-top))", left: 16, right: 16, zIndex: 50, maxWidth: 528, margin: "0 auto" }}>
-          <div className={`banner banner-${toast.tone}`} style={{ boxShadow: "var(--shadow)" }}>{toast.text}</div>
+          <div className={`banner banner-${toast.tone}`} style={{ boxShadow: "var(--shadow-float)" }}>{toast.text}</div>
         </div>
       )}
       {renderScreen()}

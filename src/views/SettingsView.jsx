@@ -11,14 +11,21 @@ function Toggle({ checked, onChange }) {
       aria-pressed={checked}
       style={{
         width: 46, height: 27, borderRadius: 999, border: "none", cursor: "pointer",
-        background: checked ? "var(--green)" : "var(--surface-2)",
+        background: checked
+          ? "linear-gradient(180deg, var(--green-strong), var(--green-deep))"
+          : "linear-gradient(180deg, var(--bg-deep), var(--bg-raised))",
         position: "relative", transition: "background 0.15s ease", flexShrink: 0,
+        boxShadow: checked
+          ? "var(--shadow-inset), 0 0 12px -3px var(--green-glow)"
+          : "var(--shadow-inset)",
       }}
     >
       <span style={{
         position: "absolute", top: 3, left: checked ? 22 : 3,
-        width: 21, height: 21, borderRadius: "50%", background: "#fff",
-        transition: "left 0.15s ease", boxShadow: "0 1px 3px rgba(0,0,0,0.4)",
+        width: 21, height: 21, borderRadius: "50%",
+        background: "radial-gradient(circle at 35% 30%, #ffffff, #cfd8d1 70%, #aab5ac)",
+        transition: "left 0.15s ease",
+        boxShadow: "inset 0 -2px 3px rgba(0,0,0,0.25), 0 2px 4px rgba(0,0,0,0.55)",
       }} />
     </button>
   );
