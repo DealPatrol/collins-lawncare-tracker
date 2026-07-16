@@ -55,6 +55,7 @@ function migrateLegacy() {
     activeEmployeeId: null,
     jobs: jobs.map((j) => ({ radius: null, ...j })),
     workdays,
+    prospects: [],
     settings: { ...DEFAULT_SETTINGS, homeAddress, homeCoords },
   };
 }
@@ -68,6 +69,7 @@ export function loadState() {
       employees: existing.employees || [],
       jobs: existing.jobs || [],
       workdays: existing.workdays || {},
+      prospects: existing.prospects || [],
     };
   }
   return migrateLegacy();
@@ -113,6 +115,23 @@ export function pruneWorkdays(workdays) {
   return pruned;
 }
 
+// ── Prospects (leads) ─────────────────────────────────────────
+// prospect: { id, name, address, coords, targetMonthly, status, createdAt }
+// status: "new" | "quoted" | "won" | "lost"
+
+export function makeProspect(data) {
+  return {
+    id: `pros_${Date.now()}_${Math.floor(Math.random() * 1e4)}`,
+    name: "",
+    address: "",
+    coords: null,
+    targetMonthly: null,
+    status: "new",
+    createdAt: Date.now(),
+    ...data,
+  };
+}
+
 export function makeEmployee(name, role = "crew", existing = []) {
   return {
     id: `emp_${Date.now()}_${Math.floor(Math.random() * 1e4)}`,
@@ -143,6 +162,7 @@ export function parseBackup(raw) {
       activeEmployeeId: data.activeEmployeeId ?? null,
       jobs: data.jobs,
       workdays: data.workdays || {},
+      prospects: data.prospects || [],
       settings: { ...DEFAULT_SETTINGS, ...data.settings },
     };
   }
@@ -160,6 +180,7 @@ export function parseBackup(raw) {
       activeEmployeeId: null,
       jobs: data.jobs.map((j) => ({ radius: null, ...j })),
       workdays,
+      prospects: [],
       settings: {
         ...DEFAULT_SETTINGS,
         homeAddress: data.homeAddress || "",

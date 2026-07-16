@@ -85,6 +85,9 @@ export default function JobsView({ state, activeJob, openJob, onAddJob }) {
                       {mowed ? "Done this week" : "To do"}
                     </span>
                   )}
+                  {j.billing === "monthly" && j.monthlyRate > 0 && (
+                    <span className="text-blue" style={{ fontWeight: 700 }}>{formatMoney(j.monthlyRate)}/mo</span>
+                  )}
                   {getAvgTime(j) > 0 && <span className="text-faint">~{formatDuration(getAvgTime(j))}</span>}
                   {j.coords && <span className="text-faint" style={{ display: "inline-flex", alignItems: "center", gap: 3 }}><IconPin size={12} />pinned</span>}
                 </div>
