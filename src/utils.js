@@ -176,3 +176,117 @@ export function rateColorClass(rate) {
   if (rate >= 40) return "text-warn";
   return "text-bad";
 }
+
+// ── Growth zones ──────────────────────────────────────────────
+// Cluster pinned jobs into geographic "zones" (single-linkage: any two jobs
+// within CLUSTER_RADIUS_M of each other share a zone), then score each zone's
+// real earning rate with drive time included. Thin zones — a long drive for
+// one or two yards — surface as the places to add work or raise prices.
+
+export const ZONE_TARGET_RATE = 55; // $/hr goal once drive time is counted
+export const CLUSTER_RADIUS_M = 2000; // ~1.2 mi — same-neighborhood scale
+const DEFAULT_WORK_SEC = 45 * 60; // planning estimate for yards with no history
+const PER_YARD_HOP_SEC = 3 * 60; // intra-zone drive added per extra yard
+
+// Weekly revenue normalizes per-visit and monthly-contract jobs so zones
+// with mixed billing compare fairly. Per-visit jobs assume the weekly mow
+// cadence the checklist is built around.
+export function weeklyRevenue(job) {
+  if (job.billing === "monthly" && job.monthlyRate > 0) return (job.monthlyRate * 12) / 52;
+  return job.pay || 0;
+}
+
+export function monthlyRevenue(job) {
+  return (weeklyRevenue(job) * 52) / 12;
+}
+
+export function centroidOf(coordsList) {
+  if (!coordsList.length) return null;
+  return {
+    lat: coordsList.reduce((a, c) => a + c.lat, 0) / coordsList.length,
+    lng: coordsList.reduce((a, c) => a + c.lng, 0) / coordsList.length,
+  };
+}
+
+export function clusterJobs(jobs, radiusM = CLUSTER_RADIUS_M) {
+  const pinned = jobs.filter((j) => j.coords);
+  const parent = pinned.map((_, i) => i);
+  const find = (i) => (parent[i] === i ? i : (parent[i] = find(parent[i])));
+  for (let i = 0; i < pinned.length; i++) {
+    for (let k = i + 1; k < pinned.length; k++) {
+      if (haversineMeters(pinned[i].coords, pinned[k].coords) <= radiusM) {
+        parent[find(i)] = find(k);
+      }
+    }
+  }
+  const groups = new Map();
+  pinned.forEach((job, i) => {
+    const root = find(i);
+    if (!groups.has(root)) groups.set(root, []);
+    groups.get(root).push(job);
+  });
+  return [...groups.values()];
+}
+
+export function zoneEconomics(zoneJobs, origin) {
+  const centroid = centroidOf(zoneJobs.map((j) => j.coords));
+  const weekly = zoneJobs.reduce((a, j) => a + weeklyRevenue(j), 0);
+  const workSec = zoneJobs.reduce((a, j) => a + (getAvgTime(j) || DEFAULT_WORK_SEC), 0);
+
+  // Round trip from home plus short hops between yards inside the zone.
+  const tripSec = origin ? 2 * estimateDriveSeconds(origin, centroid) : 0;
+  const hopSec = Math.max(0, zoneJobs.length - 1) * PER_YARD_HOP_SEC;
+  const driveSec = tripSec + hopSec;
+
+  const totalSec = workSec + driveSec;
+  const rate = totalSec > 0 ? weekly / (totalSec / 3600) : 0;
+
+  // Model an added yard as an average yard for this zone, so the pitch
+  // ("one more yard here → $X/hr") reflects local prices and lawn sizes.
+  const avgYardWeekly = weekly / zoneJobs.length;
+  const avgYardWorkSec = workSec / zoneJobs.length;
+  const rateWithMore = (n) =>
+    (weekly + avgYardWeekly * n) / ((totalSec + (avgYardWorkSec + PER_YARD_HOP_SEC) * n) / 3600);
+
+  let yardsToTarget = 0;
+  if (rate < ZONE_TARGET_RATE) {
+    for (let n = 1; n <= 8; n++) {
+      if (rateWithMore(n) >= ZONE_TARGET_RATE) { yardsToTarget = n; break; }
+      if (n === 8) yardsToTarget = 9; // "9+" — drive is too long to fix with density
+    }
+  }
+
+  const anchor = zoneJobs.reduce((a, j) => (monthlyRevenue(j) > monthlyRevenue(a) ? j : a), zoneJobs[0]);
+  return {
+    jobs: zoneJobs,
+    anchor,
+    centroid,
+    weekly,
+    monthly: (weekly * 52) / 12,
+    workSec,
+    driveSec,
+    tripSec,
+    rate,
+    rateWithOneMore: rateWithMore(1),
+    yardsToTarget,
+  };
+}
+
+// Jobs whose isolation makes them a drag on the whole route: the round-trip
+// detour to reach them (from the nearest other yard or home) pushes their
+// true rate under target.
+export function routeDrags(jobs, origin) {
+  const pinned = jobs.filter((j) => j.coords);
+  return pinned
+    .map((job) => {
+      const anchors = pinned.filter((o) => o.id !== job.id).map((o) => o.coords);
+      if (origin) anchors.push(origin);
+      if (!anchors.length) return null;
+      const detourSec = 2 * Math.min(...anchors.map((c) => estimateDriveSeconds(job.coords, c)));
+      const workSec = getAvgTime(job) || DEFAULT_WORK_SEC;
+      const trueRate = weeklyRevenue(job) / ((workSec + detourSec) / 3600);
+      return { job, detourSec, trueRate };
+    })
+    .filter((d) => d && d.detourSec >= 12 * 60 && d.trueRate < ZONE_TARGET_RATE)
+    .sort((a, b) => a.trueRate - b.trueRate);
+}

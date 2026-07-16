@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadState, saveState, getWorkday, setWorkday, pruneWorkdays, makeEmployee } from "./store.js";
+import { loadState, saveState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect } from "./store.js";
 import { getTodayKey, getWeekKey } from "./utils.js";
 import { getCurrentCoords } from "./location.js";
 import { useGpsTracking } from "./useGpsTracking.js";
@@ -97,6 +97,37 @@ export default function App() {
   const deleteJob = (jobId) => {
     setState((s) => ({ ...s, jobs: s.jobs.filter((j) => j.id !== jobId) }));
     setSubview(null);
+  };
+
+  // ── Prospects (Growth Zones leads) ──
+  const addProspect = (data) => {
+    setState((s) => ({ ...s, prospects: [...(s.prospects || []), makeProspect(data)] }));
+  };
+
+  const updateProspect = (id, patch) => {
+    setState((s) => ({
+      ...s,
+      prospects: (s.prospects || []).map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }));
+  };
+
+  const deleteProspect = (id) => {
+    setState((s) => ({ ...s, prospects: (s.prospects || []).filter((p) => p.id !== id) }));
+  };
+
+  // A won lead becomes a job: open the form prefilled as a monthly contract.
+  const convertProspect = (prospect) => {
+    updateProspect(prospect.id, { status: "won" });
+    setSubview({
+      kind: "form",
+      prefill: {
+        name: prospect.name,
+        address: prospect.address || "",
+        coords: prospect.coords || null,
+        billing: prospect.targetMonthly ? "monthly" : "visit",
+        monthlyRate: prospect.targetMonthly || null,
+      },
+    });
   };
 
   const toggleMow = (jobId) => {
@@ -263,6 +294,10 @@ export default function App() {
     state, me, myDay, workdayRunning, activeJob, lastFix, gpsError, todayKey, now,
     startWorkday, endWorkday, startTimer, stopTimer, toggleMow, openJob,
     onAddJob: () => setSubview({ kind: "form" }),
+    onAddProspect: addProspect,
+    onUpdateProspect: updateProspect,
+    onDeleteProspect: deleteProspect,
+    onConvertProspect: convertProspect,
     showToast,
   };
 
@@ -272,6 +307,7 @@ export default function App() {
       return (
         <JobForm
           job={state.jobs.find((j) => j.id === subJobId) || null}
+          prefill={effectiveSubview.prefill || null}
           settings={state.settings}
           onSave={(data) => upsertJob(data, subJobId)}
           onBack={() => setSubview(subJobId ? { kind: "detail", jobId: subJobId } : null)}

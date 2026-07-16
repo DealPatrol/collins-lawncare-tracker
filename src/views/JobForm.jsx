@@ -2,16 +2,19 @@ import { useState } from "react";
 import { getCurrentCoords } from "../location.js";
 import { IconChevronLeft, IconPin } from "../icons.jsx";
 
-export default function JobForm({ job, settings, onSave, onBack }) {
+export default function JobForm({ job, prefill, settings, onSave, onBack }) {
   const isEdit = !!job;
+  const src = job || prefill || null;
   const [form, setForm] = useState({
-    name: job?.name || "",
-    address: job?.address || "",
-    pay: job?.pay ?? "",
-    notes: job?.notes || "",
-    lat: job?.coords?.lat ?? "",
-    lng: job?.coords?.lng ?? "",
-    radius: job?.radius ?? "",
+    name: src?.name || "",
+    address: src?.address || "",
+    pay: src?.pay ?? "",
+    billing: src?.billing || "visit",
+    monthlyRate: src?.monthlyRate ?? "",
+    notes: src?.notes || "",
+    lat: src?.coords?.lat ?? "",
+    lng: src?.coords?.lng ?? "",
+    radius: src?.radius ?? "",
   });
   const [geoStatus, setGeoStatus] = useState("");
 
@@ -34,12 +37,15 @@ export default function JobForm({ job, settings, onSave, onBack }) {
     if (!valid) return;
     const lat = parseFloat(form.lat);
     const lng = parseFloat(form.lng);
-    const coords = !isNaN(lat) && !isNaN(lng) ? { lat, lng } : job?.coords || null;
+    const coords = !isNaN(lat) && !isNaN(lng) ? { lat, lng } : src?.coords || null;
     const radius = parseInt(form.radius, 10);
+    const monthlyRate = parseFloat(form.monthlyRate);
     onSave({
       name: form.name.trim(),
       address: form.address.trim(),
       pay: parseFloat(form.pay),
+      billing: form.billing,
+      monthlyRate: form.billing === "monthly" && !isNaN(monthlyRate) && monthlyRate > 0 ? monthlyRate : null,
       notes: form.notes,
       coords,
       radius: !isNaN(radius) && radius > 0 ? radius : null,
@@ -61,6 +67,29 @@ export default function JobForm({ job, settings, onSave, onBack }) {
 
           <label className="field-label">Address</label>
           <input className="input" placeholder="123 Main St, Hanceville AL" value={form.address} onChange={set("address")} />
+
+          <label className="field-label">Billing</label>
+          <div className="seg-control" style={{ marginBottom: 14 }}>
+            <button
+              className={`seg-option${form.billing === "visit" ? " active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, billing: "visit" }))}
+            >
+              Per Visit
+            </button>
+            <button
+              className={`seg-option${form.billing === "monthly" ? " active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, billing: "monthly" }))}
+            >
+              Monthly Contract
+            </button>
+          </div>
+
+          {form.billing === "monthly" && (
+            <>
+              <label className="field-label">Contract rate ($/month)</label>
+              <input className="input" type="number" inputMode="decimal" placeholder="180" value={form.monthlyRate} onChange={set("monthlyRate")} />
+            </>
+          )}
 
           <label className="field-label">Pay per visit ($) *</label>
           <input className="input" type="number" inputMode="decimal" placeholder="45" value={form.pay} onChange={set("pay")} />

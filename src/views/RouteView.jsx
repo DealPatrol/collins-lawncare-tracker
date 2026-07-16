@@ -1,14 +1,18 @@
+import { useState } from "react";
 import {
   estimateDriveMeters, estimateDriveSeconds, formatDuration, formatMiles,
   formatMoney, formatTime, getAvgTime, isMowedThisWeek, optimizeRoute,
 } from "../utils.js";
 import { IconHome, IconMap, IconExternal, IconPin, IconAlert, IconRoute } from "../icons.jsx";
+import GrowthView from "./GrowthView.jsx";
 
 const DEFAULT_CENTER = { lat: 34.0632, lng: -86.7686 };
 const DEFAULT_JOB_SEC = 45 * 60; // planning estimate for yards with no history
 
-export default function RouteView({ state, lastFix, openJob, now }) {
+export default function RouteView(props) {
+  const { state, lastFix, openJob, now } = props;
   const { jobs, settings } = state;
+  const [mode, setMode] = useState("plan");
   const origin = settings.homeCoords || lastFix || null;
 
   const pending = jobs.filter((j) => !isMowedThisWeek(j));
@@ -67,8 +71,8 @@ export default function RouteView({ state, lastFix, openJob, now }) {
   return (
     <>
       <div className="header">
-        <h1 className="header-title">Route Planner</h1>
-        {mapsUrl && (
+        <h1 className="header-title">{mode === "plan" ? "Route Planner" : "Growth Zones"}</h1>
+        {mode === "plan" && mapsUrl && (
           <a className="btn btn-blue btn-sm" href={mapsUrl} target="_blank" rel="noreferrer">
             <IconExternal size={14} />Google Maps
           </a>
@@ -76,7 +80,14 @@ export default function RouteView({ state, lastFix, openJob, now }) {
       </div>
 
       <div className="screen">
-        {pending.length > 0 && (
+        <div className="seg-control">
+          <button className={`seg-option${mode === "plan" ? " active" : ""}`} onClick={() => setMode("plan")}>Today&apos;s Plan</button>
+          <button className={`seg-option${mode === "growth" ? " active" : ""}`} onClick={() => setMode("growth")}>Growth Zones</button>
+        </div>
+
+        {mode === "growth" && <GrowthView {...props} />}
+
+        {mode === "plan" && pending.length > 0 && (
           <div className="stat-grid" style={{ marginBottom: 12 }}>
             <div className="stat-tile">
               <div className="stat-value">{pending.length}</div>
@@ -93,7 +104,7 @@ export default function RouteView({ state, lastFix, openJob, now }) {
           </div>
         )}
 
-        {plan.stops.length > 0 && (
+        {mode === "plan" && plan.stops.length > 0 && (
           <div className="card">
             <div className="row-between" style={{ marginBottom: 4 }}>
               <div className="section-title" style={{ margin: 0 }}><IconRoute size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Optimized Order</div>
@@ -141,7 +152,7 @@ export default function RouteView({ state, lastFix, openJob, now }) {
           </div>
         )}
 
-        {unroutable.length > 0 && (
+        {mode === "plan" && unroutable.length > 0 && (
           <div className="card card-tight">
             <div className="section-title"><IconAlert size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Needs a GPS pin</div>
             {unroutable.map((j) => (
@@ -156,7 +167,7 @@ export default function RouteView({ state, lastFix, openJob, now }) {
           </div>
         )}
 
-        {pending.length === 0 && (
+        {mode === "plan" && pending.length === 0 && (
           <div className="empty-state">
             <div className="empty-icon"><IconMap size={44} /></div>
             <div style={{ fontWeight: 700, marginBottom: 6 }}>

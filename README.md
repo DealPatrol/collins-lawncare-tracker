@@ -16,6 +16,9 @@ A crew-ready lawncare operations app: GPS-automated time tracking, route plannin
 
 ### Planning & money
 - 🗺 **Route Planner** — optimized stop order (nearest-neighbor + 2-opt), per-leg drive estimates, rolling ETAs, and one-tap Google Maps navigation
+- 📈 **Growth Zones** — groups pinned yards into geographic zones and scores each zone's true $/hr *with drive time included*; shows which zones are anchors, which need 1–2 more yards to be worth the trip, and flags isolated "route drag" yards where the detour eats the pay
+- 🎯 **Lead tracker** — log prospects zone-by-zone while you're already in the neighborhood (New → Quoted → Won), set a target monthly rate, and convert a won lead straight into a job
+- 📄 **Monthly contracts** — jobs can bill per-visit or as year-round monthly contracts; zone revenue and growth math use real contract value
 - 🌦 Weather on the dashboard with rain-window warnings (Open-Meteo, no API key)
 - ⏱ Per-job timers, weekly mow checklist (resets every Monday), $/hr rate scoring
 - 📊 Workday clock, 7-day earnings chart, weekly revenue
