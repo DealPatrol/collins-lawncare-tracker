@@ -106,7 +106,6 @@ export default function LawncareTracker() {
   const [view, setView] = useState("dashboard"); // dashboard | add | detail | route | settings | priority | analytics | invoice
   const [selectedJob, setSelectedJob] = useState(null);
   const [routeOrder, setRouteOrder] = useState([]);
-  const [invoiceJobId, setInvoiceJobId] = useState(null);
   const [businessInfo, setBusinessInfo] = useState({ name: "Collins Lawncare", phone: "", address: "" });
   const runningOnLoad = getRunningJob(loadJobs());
   const [activeTimer, setActiveTimer] = useState(runningOnLoad?.id ?? null);
@@ -601,11 +600,6 @@ export default function LawncareTracker() {
       }
     };
 
-    if (invoiceJobId) {
-      generateInvoice(invoiceJobId);
-      setInvoiceJobId(null);
-    }
-
     return (
       <div style={styles.page}>
         <div style={styles.header}>
@@ -637,7 +631,7 @@ export default function LawncareTracker() {
               {jobs.filter(j => (j.sessions || []).length > 0).map(j => {
                 const revenue = (j.sessions || []).reduce((s, sess) => s + (sess.pay || 0), 0);
                 return (
-                  <div key={j.id} style={{ ...styles.jobCard, cursor: "pointer" }} onClick={() => setInvoiceJobId(j.id)}>
+                  <div key={j.id} style={{ ...styles.jobCard, cursor: "pointer" }} onClick={() => generateInvoice(j.id)}>
                     <div style={styles.jobCardLeft}>
                       <div style={styles.jobName}>{j.name}</div>
                       {j.clientName && <div style={{ color: "#64748b", fontSize: 12 }}>Client: {j.clientName}</div>}
