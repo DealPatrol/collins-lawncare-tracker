@@ -5,6 +5,8 @@ const STORAGE_KEY = "collins_lawncare_jobs";
 const DAY_KEY = "collins_workday";
 const HOME_KEY = "collins_home";
 const HOME_COORDS_KEY = "collins_home_coords";
+const CREW_NAME_KEY = "collins_crew_name";
+const ONBOARDED_KEY = "collins_onboarded";
 const DEFAULT_CENTER = { lat: 34.0632, lng: -86.7686 };
 
 function getWeekKey(date = new Date()) {
@@ -103,6 +105,14 @@ export default function LawncareTracker() {
 
   const [workday, setWorkday] = useState(loadWorkday);
 
+  const [hasOnboarded, setHasOnboarded] = useState(() => {
+    return localStorage.getItem(ONBOARDED_KEY) === "true";
+  });
+  const [crewName, setCrewName] = useState(() => {
+    return localStorage.getItem(CREW_NAME_KEY) || "";
+  });
+  const [onboardingCrewName, setOnboardingCrewName] = useState("");
+
   const [view, setView] = useState("dashboard"); // dashboard | add | detail | route | settings | priority | analytics | invoice
   const [selectedJob, setSelectedJob] = useState(null);
   const [routeOrder, setRouteOrder] = useState([]);
@@ -144,6 +154,13 @@ export default function LawncareTracker() {
   useEffect(() => {
     localStorage.setItem(DAY_KEY, JSON.stringify(workday));
   }, [workday]);
+
+  // Persist crew name
+  useEffect(() => {
+    if (crewName) {
+      localStorage.setItem(CREW_NAME_KEY, crewName);
+    }
+  }, [crewName]);
 
 
   useEffect(() => {
@@ -325,6 +342,57 @@ export default function LawncareTracker() {
   const todayRevenue = workday?.stops
     ? jobs.filter(j => workday.stops.some(s => s.jobId === j.id)).reduce((a, j) => a + j.pay, 0)
     : 0;
+
+  // ── ONBOARDING SCREEN ──
+  if (!hasOnboarded) {
+    return (
+      <div style={styles.page}>
+        <div style={{ flex: 1, display: "flex", flexDirection: "column", justifyContent: "center", alignItems: "center", padding: "20px", textAlign: "center" }}>
+          <div style={{ fontSize: 48, marginBottom: 20 }}>🌱</div>
+          <h1 style={{ ...styles.headerTitle, fontSize: 28, marginBottom: 12 }}>Collins Lawncare</h1>
+          <div style={{ ...styles.sectionTitle, color: "#64748b", fontSize: 16, marginBottom: 20, fontWeight: 400 }}>
+            Track jobs, manage your crew, and grow your business.
+          </div>
+          
+          <div style={styles.card}>
+            <div style={styles.sectionTitle}>Enter Your Crew Name</div>
+            <input 
+              style={styles.input} 
+              placeholder="e.g., Collins Crew, Smith Brothers..." 
+              value={onboardingCrewName}
+              onChange={e => setOnboardingCrewName(e.target.value)}
+              onKeyPress={e => {
+                if (e.key === "Enter" && onboardingCrewName.trim()) {
+                  setCrewName(onboardingCrewName.trim());
+                  localStorage.setItem(ONBOARDED_KEY, "true");
+                  setHasOnboarded(true);
+                }
+              }}
+            />
+            <div style={{ fontSize: 12, color: "#64748b", marginTop: 8 }}>This will appear at the top of your dashboard.</div>
+          </div>
+
+          <button 
+            style={{ ...styles.primaryBtn, marginTop: 24, opacity: onboardingCrewName.trim() ? 1 : 0.5, cursor: onboardingCrewName.trim() ? "pointer" : "not-allowed" }}
+            onClick={() => {
+              if (onboardingCrewName.trim()) {
+                setCrewName(onboardingCrewName.trim());
+                localStorage.setItem(ONBOARDED_KEY, "true");
+                setHasOnboarded(true);
+              }
+            }}
+          >
+            Get Started
+          </button>
+
+          <div style={{ marginTop: 24, fontSize: 11, color: "#475569" }}>
+            <div>Local storage only • No account needed</div>
+            <div style={{ marginTop: 4 }}>Your data stays on your device</div>
+          </div>
+        </div>
+      </div>
+    );
+  }
 
   // ── PRIORITY & SMART ROUTING VIEW ──
   if (view === "priority") {
@@ -892,6 +960,19 @@ export default function LawncareTracker() {
             ⬆ Restore from Backup
           </button>
         </div>
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Legal</div>
+          <div style={{ display: "flex", gap: 12, flexDirection: "column" }}>
+            <a href="docs/privacy.html" target="_blank" rel="noopener noreferrer" 
+              style={{ color: "#00d2ef", textDecoration: "none", fontSize: 13, padding: "10px 0", borderBottom: "1px solid #1e2a38", paddingBottom: 10 }}>
+              📋 Privacy Policy
+            </a>
+            <a href="docs/terms.html" target="_blank" rel="noopener noreferrer"
+              style={{ color: "#00d2ef", textDecoration: "none", fontSize: 13, padding: "10px 0" }}>
+              ⚖️ Terms of Service
+            </a>
+          </div>
+        </div>
         {geoError && <div style={{ color: "#4ade80", fontSize: 12, margin: "0 16px", textAlign: "center" }}>{geoError}</div>}
       </div>
     );
@@ -1113,7 +1194,7 @@ export default function LawncareTracker() {
       {/* Header */}
       <div style={styles.header}>
         <div>
-          <div style={styles.brand}>Collins Lawncare</div>
+          <div style={styles.brand}>{crewName || "Collins Lawncare"}</div>
           <div style={styles.subBrand}>Schedule & Pay Tracker</div>
         </div>
         <div style={{ display: "flex", gap: 8 }}>
