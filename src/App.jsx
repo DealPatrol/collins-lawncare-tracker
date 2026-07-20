@@ -336,13 +336,32 @@ export default function LawncareTracker() {
       return (b.pay || 0) - (a.pay || 0);
     });
 
-    // Initialize routeOrder from jobs if not already set
-    if (routeOrder.length === 0 && jobsWithPriority.length > 0) {
-      setRouteOrder(jobsWithPriority.map(j => j.id));
+    // Build the ordered list of jobs based on routeOrder, keeping it in sync
+    // with the current set of jobs (drop removed ids, append new ones in
+    // priority order). This is the single source of truth for the rendered list.
+    const orderedJobs = [
+      ...routeOrder
+        .map(id => jobs.find(j => j.id === id))
+        .filter(Boolean),
+      ...jobsWithPriority.filter(j => !routeOrder.includes(j.id)),
+    ];
+
+    // Persist the reconciled order when it drifts from the stored routeOrder
+    // (initial load, jobs added/removed).
+    const reconciledOrder = orderedJobs.map(j => j.id);
+    const orderChanged =
+      reconciledOrder.length !== routeOrder.length ||
+      reconciledOrder.some((id, i) => id !== routeOrder[i]);
+    if (orderChanged) {
+      setRouteOrder(reconciledOrder);
     }
 
     const reorderJobs = (fromIdx, toIdx) => {
-      const newOrder = [...routeOrder];
+      if (
+        fromIdx < 0 || toIdx < 0 ||
+        fromIdx >= reconciledOrder.length || toIdx >= reconciledOrder.length
+      ) return;
+      const newOrder = [...reconciledOrder];
       const [moved] = newOrder.splice(fromIdx, 1);
       newOrder.splice(toIdx, 0, moved);
       setRouteOrder(newOrder);
@@ -360,8 +379,8 @@ export default function LawncareTracker() {
           <div style={styles.sectionTitle}>Reorder Your Route</div>
           <div style={{ fontSize: 11, color: "#64748b", marginBottom: 12 }}>Drag to adjust order. Sorted by priority and pay.</div>
           {jobs.length === 0 && <div style={styles.empty}>No jobs added yet</div>}
-          {jobsWithPriority.map((job, idx) => {
-            const orderedIdx = routeOrder.indexOf(job.id);
+          {orderedJobs.map((job, idx) => {
+            const orderedIdx = idx;
             return (
               <div key={job.id} style={{
                 ...styles.routeJobRow,
@@ -384,7 +403,7 @@ export default function LawncareTracker() {
                     <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", padding: "4px 8px", fontSize: 11 }}
                       onClick={() => reorderJobs(orderedIdx, orderedIdx - 1)}>↑</button>
                   )}
-                  {orderedIdx < jobsWithPriority.length - 1 && (
+                  {orderedIdx < orderedJobs.length - 1 && (
                     <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", padding: "4px 8px", fontSize: 11 }}
                       onClick={() => reorderJobs(orderedIdx, orderedIdx + 1)}>↓</button>
                   )}
