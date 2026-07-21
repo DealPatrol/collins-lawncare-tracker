@@ -18,6 +18,8 @@ export const DEFAULT_SETTINGS = {
   autoStop: true,
   autoArriveDetect: true,
   weather: true,
+  bizPhone: "", // callback number merged into outreach messages
+  regridToken: "", // parcel-records API key that powers the Prospector
 };
 
 function readJSON(key, fallback) {
@@ -116,8 +118,11 @@ export function pruneWorkdays(workdays) {
 }
 
 // ── Prospects (leads) ─────────────────────────────────────────
-// prospect: { id, name, address, coords, targetMonthly, status, createdAt }
+// prospect: { id, name, address, coords, targetMonthly, status, createdAt,
+//   owner, phone, email, value, mailAddress, source, lastContactedAt }
 // status: "new" | "quoted" | "won" | "lost"
+// owner/value/mailAddress come from public county parcel records when the
+// lead was found by the Prospector; phone/email are only ever user-entered.
 
 export function makeProspect(data) {
   return {
@@ -128,6 +133,13 @@ export function makeProspect(data) {
     targetMonthly: null,
     status: "new",
     createdAt: Date.now(),
+    owner: "",
+    phone: "",
+    email: "",
+    value: null,
+    mailAddress: "",
+    source: "manual", // "manual" | "parcel"
+    lastContactedAt: null,
     ...data,
   };
 }
