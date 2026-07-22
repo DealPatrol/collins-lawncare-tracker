@@ -1,5 +1,8 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadState, saveState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect } from "./store.js";
+import {
+  loadState, saveState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect,
+  encodeCrewInvite, decodeCrewInvite, applyCrewInvite,
+} from "./store.js";
 import { getTodayKey, getWeekKey } from "./utils.js";
 import { getCurrentCoords } from "./location.js";
 import { useGpsTracking } from "./useGpsTracking.js";
@@ -276,13 +279,25 @@ export default function App() {
     showToast("Backup restored.");
   };
 
+  // ── Crew invites ──
+  // One-time merge of another crew member's jobs + roster onto this phone —
+  // see store.js for why this stands in for real sync for now. Returns a
+  // summary so the caller (Onboarding or Crew tab) can report what happened;
+  // throws with a user-facing message on a bad/garbled code.
+  const joinCrew = (code) => {
+    const invite = decodeCrewInvite(code);
+    const result = applyCrewInvite(state, invite);
+    setState(result.state);
+    return result;
+  };
+
   // Treat a detail subview whose job no longer exists as closed.
   const detailJob = subview?.kind === "detail" ? state.jobs.find((j) => j.id === subview.jobId) : null;
   const effectiveSubview = subview?.kind === "detail" && !detailJob ? null : subview;
 
   // ── Render ──
   if (!state.employees.length || !me) {
-    return <Onboarding employees={state.employees} onCreate={addEmployee} onPick={switchEmployee} />;
+    return <Onboarding employees={state.employees} onCreate={addEmployee} onPick={switchEmployee} onJoinCrew={joinCrew} />;
   }
 
   const openJob = (jobId) => setSubview({ kind: "detail", jobId });
@@ -324,7 +339,7 @@ export default function App() {
     }
     if (tab === "jobs") return <JobsView {...shared} />;
     if (tab === "route") return <RouteView {...shared} />;
-    if (tab === "crew") return <CrewView {...shared} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onSwitchEmployee={switchEmployee} />;
+    if (tab === "crew") return <CrewView {...shared} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onSwitchEmployee={switchEmployee} onJoinCrew={joinCrew} getInviteCode={() => encodeCrewInvite(state)} />;
     if (tab === "settings") {
       return <SettingsView {...shared} onUpdateSettings={updateSettings} onRestore={restoreState} onSwitchEmployee={switchEmployee} />;
     }

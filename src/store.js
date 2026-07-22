@@ -202,3 +202,79 @@ export function parseBackup(raw) {
   }
   throw new Error("Unrecognized backup format");
 }
+
+// ── Crew invites ──────────────────────────────────────────────
+// A compact, shareable stand-in for real cross-device sync: one crew member
+// generates a code from their current jobs + roster, another pastes it in
+// and gets those merged onto their phone. Each phone still tracks its own
+// time after that — there's no live sharing — but everyone starts from the
+// same job list, and employee ids stay consistent for when real sync lands.
+
+function jobKey(job) {
+  return `${(job.name || "").trim().toLowerCase()}|${(job.address || "").trim().toLowerCase()}`;
+}
+
+export function buildCrewInvite(state) {
+  return {
+    kind: "crew-invite",
+    version: 1,
+    exportedAt: new Date().toISOString(),
+    employees: state.employees.map(({ id, name, role, color }) => ({ id, name, role, color })),
+    jobs: state.jobs.map((j) => ({
+      id: j.id,
+      name: j.name,
+      address: j.address || "",
+      coords: j.coords || null,
+      pay: j.pay ?? 0,
+      billing: j.billing || "visit",
+      monthlyRate: j.monthlyRate ?? null,
+      radius: j.radius ?? null,
+    })),
+  };
+}
+
+// btoa/atob only handle Latin1, so UTF-8 text (names with accents, etc.)
+// needs escaping through both ends of the round trip.
+export function encodeCrewInvite(state) {
+  const json = JSON.stringify(buildCrewInvite(state));
+  return btoa(unescape(encodeURIComponent(json)));
+}
+
+export function decodeCrewInvite(code) {
+  let data;
+  try {
+    data = JSON.parse(decodeURIComponent(escape(atob(code.trim()))));
+  } catch {
+    throw new Error("That doesn't look like a valid invite code.");
+  }
+  if (data?.kind !== "crew-invite" || !Array.isArray(data.jobs) || !Array.isArray(data.employees)) {
+    throw new Error("That doesn't look like a valid invite code.");
+  }
+  return data;
+}
+
+// Merges an invite into local state without touching anything already here —
+// skips employees/jobs that match by id or by name (+address, for jobs).
+export function applyCrewInvite(state, invite) {
+  const existingEmpIds = new Set(state.employees.map((e) => e.id));
+  const existingEmpNames = new Set(state.employees.map((e) => e.name.trim().toLowerCase()));
+  const newEmployees = invite.employees.filter(
+    (e) => !existingEmpIds.has(e.id) && !existingEmpNames.has((e.name || "").trim().toLowerCase())
+  );
+
+  const existingJobIds = new Set(state.jobs.map((j) => j.id));
+  const existingJobKeys = new Set(state.jobs.map(jobKey));
+  const newJobs = invite.jobs
+    .filter((j) => !existingJobIds.has(j.id) && !existingJobKeys.has(jobKey(j)))
+    .map((j) => ({ ...j, sessions: [], weeklyMows: {} }));
+
+  return {
+    state: {
+      ...state,
+      employees: [...state.employees, ...newEmployees],
+      jobs: [...state.jobs, ...newJobs],
+    },
+    addedEmployees: newEmployees.length,
+    addedJobs: newJobs.length,
+  };
+}

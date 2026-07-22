@@ -3,7 +3,75 @@ import { todaysCrewDays } from "../store.js";
 import {
   formatDuration, formatMiles, formatMoney, formatTime, getWeekKey, lastNDayKeys,
 } from "../utils.js";
-import { IconUsers, IconTrophy, IconPlus, IconTrash, IconCheck } from "../icons.jsx";
+import { IconUsers, IconTrophy, IconPlus, IconTrash, IconCheck, IconCopy, IconExternal, IconSend } from "../icons.jsx";
+
+function InviteCrew({ getInviteCode, onJoinCrew, showToast }) {
+  const [joinCode, setJoinCode] = useState("");
+  const [joining, setJoining] = useState(false);
+
+  const copyInvite = async () => {
+    const code = getInviteCode();
+    try {
+      await navigator.clipboard.writeText(code);
+      showToast("Invite code copied — text or AirDrop it to your crew.");
+    } catch {
+      showToast("Could not copy on this device.", "amber");
+    }
+  };
+
+  const shareInvite = async () => {
+    const code = getInviteCode();
+    try {
+      await navigator.share({ text: code, title: "Collins Lawncare crew invite" });
+    } catch { /* user cancelled the share sheet */ }
+  };
+
+  const join = () => {
+    if (!joinCode.trim()) return;
+    setJoining(true);
+    try {
+      const { addedJobs, addedEmployees } = onJoinCrew(joinCode);
+      if (!addedJobs && !addedEmployees) {
+        showToast("Nothing new in that code — you already have all of it.", "amber");
+      } else {
+        showToast(
+          `Added ${addedJobs} job${addedJobs === 1 ? "" : "s"} and ${addedEmployees} crew member${addedEmployees === 1 ? "" : "s"}.`
+        );
+      }
+      setJoinCode("");
+    } catch (e) {
+      showToast(e.message || "Invalid invite code.", "red");
+    } finally {
+      setJoining(false);
+    }
+  };
+
+  return (
+    <div className="card">
+      <div className="section-title"><IconSend size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Invite Crew</div>
+      <p className="text-dim" style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
+        Share your job list so a new crew member&apos;s phone starts with the same yards — no retyping addresses.
+        Each phone still tracks its own time separately after that.
+      </p>
+      <div className="stat-grid-2" style={{ marginBottom: 14 }}>
+        <button className="btn btn-primary" onClick={copyInvite}><IconCopy size={15} />Copy Invite Code</button>
+        {typeof navigator.share === "function" && (
+          <button className="btn btn-ghost" onClick={shareInvite}><IconExternal size={15} />Share</button>
+        )}
+      </div>
+      <div className="divider" />
+      <label className="field-label">Have a code from your crew?</label>
+      <textarea
+        className="input" rows={3} placeholder="Paste the invite code here"
+        value={joinCode} onChange={(e) => setJoinCode(e.target.value)}
+        style={{ resize: "vertical", fontSize: 12.5 }}
+      />
+      <button className="btn btn-ghost btn-block" disabled={!joinCode.trim() || joining} onClick={join}>
+        Join Crew
+      </button>
+    </div>
+  );
+}
 
 function collectStats(state, dayKeys) {
   const stats = {};
@@ -34,7 +102,7 @@ function collectStats(state, dayKeys) {
   return stats;
 }
 
-export default function CrewView({ state, me, onAddEmployee, onRemoveEmployee, onSwitchEmployee, showToast }) {
+export default function CrewView({ state, me, onAddEmployee, onRemoveEmployee, onSwitchEmployee, onJoinCrew, getInviteCode, showToast }) {
   const [range, setRange] = useState("today"); // today | week
   const [newName, setNewName] = useState("");
   const [newRole, setNewRole] = useState("crew");
@@ -103,10 +171,12 @@ export default function CrewView({ state, me, onAddEmployee, onRemoveEmployee, o
           ))}
           {!anyDistance && (
             <p className="text-faint" style={{ fontSize: 12, marginTop: 8, lineHeight: 1.5 }}>
-              Miles rack up automatically while a workday is clocked in on each member&apos;s phone. Data on this device covers profiles used here — use Settings → backup to merge devices.
+              Miles rack up automatically while a workday is clocked in on each member&apos;s phone. Leaderboard data is per-device — see Invite Crew below to get everyone on the same job list.
             </p>
           )}
         </div>
+
+        <InviteCrew getInviteCode={getInviteCode} onJoinCrew={onJoinCrew} showToast={showToast} />
 
         {/* Live crew status (today) */}
         <div className="card">
