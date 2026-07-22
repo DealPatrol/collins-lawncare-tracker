@@ -6,7 +6,9 @@ const MAX_FIX_ACCURACY_M = 50; // ignore fixes worse than this for distance
 const MAX_SEGMENT_M = 1000; // discard GPS teleports
 const EXIT_FIX_COUNT = 3; // consecutive out-of-fence fixes to auto-stop
 const EXIT_MIN_MS = 20000; // and at least this long outside
-const ARRIVE_SUGGEST_COOLDOWN_MS = 10 * 60 * 1000;
+const ENTER_FIX_COUNT = 2; // consecutive in-fence fixes to auto-start
+const ENTER_MIN_MS = 8000; // and at least this long inside — filters a single stray fix without stalling a real arrival
+const ARRIVE_COOLDOWN_MS = 10 * 60 * 1000; // don't re-fire on the same job right after it's stopped
 
 // Runs a continuous GPS watch while the workday is active and drives three
 // behaviors: odometer-style distance accumulation, geofence auto-stop for
@@ -21,7 +23,7 @@ export function useGpsTracking({ enabled, config, onDistance, onAutoStop, onArri
     ctx.current = { config, onDistance, onAutoStop, onArrive };
   });
 
-  const trackRef = useRef({ prevFix: null, exitCount: 0, exitSince: null, suggested: {} });
+  const trackRef = useRef({ prevFix: null, exitCount: 0, exitSince: null, enterCandidate: null, arrived: {} });
 
   useEffect(() => {
     if (!enabled) return;
@@ -32,6 +34,7 @@ export function useGpsTracking({ enabled, config, onDistance, onAutoStop, onArri
     track.prevFix = null;
     track.exitCount = 0;
     track.exitSince = null;
+    track.enterCandidate = null;
 
     const handleFix = (fix) => {
       if (stopped) return;
@@ -80,19 +83,38 @@ export function useGpsTracking({ enabled, config, onDistance, onAutoStop, onArri
       }
 
       // ── Arrival detection for pending jobs ──
+      // Mirrors the exit hysteresis above: require a couple of consecutive
+      // in-fence fixes over a short window before auto-starting the timer,
+      // so a single noisy fix (or driving past on the street) can't trigger it.
       if (cfg?.autoArriveDetect && !activeJob && Array.isArray(cfg?.jobs)) {
         const now = Date.now();
-        for (const job of cfg.jobs) {
-          if (!job.coords || isMowedThisWeek(job)) continue;
+        const nearby = cfg.jobs.find((job) => {
+          if (!job.coords || isMowedThisWeek(job)) return false;
           const radius = job.radius || cfg.geofenceRadius || 150;
-          if (haversineMeters(job.coords, fix) <= radius) {
-            const last = track.suggested[job.id] || 0;
-            if (now - last > ARRIVE_SUGGEST_COOLDOWN_MS) {
-              track.suggested[job.id] = now;
-              emitArrive?.(job, fix);
-            }
-            break;
+          return haversineMeters(job.coords, fix) <= radius;
+        });
+
+        if (nearby) {
+          const last = track.arrived[nearby.id] || 0;
+          if (now - last <= ARRIVE_COOLDOWN_MS) {
+            track.enterCandidate = null;
+          } else if (track.enterCandidate?.jobId === nearby.id) {
+            track.enterCandidate.count += 1;
+          } else {
+            track.enterCandidate = { jobId: nearby.id, count: 1, since: fix.timestamp || now };
           }
+
+          const cand = track.enterCandidate;
+          if (cand?.jobId === nearby.id) {
+            const insideMs = (fix.timestamp || now) - cand.since;
+            if (cand.count >= ENTER_FIX_COUNT && insideMs >= ENTER_MIN_MS) {
+              track.enterCandidate = null;
+              track.arrived[nearby.id] = now;
+              emitArrive?.(nearby, fix);
+            }
+          }
+        } else {
+          track.enterCandidate = null;
         }
       }
     };

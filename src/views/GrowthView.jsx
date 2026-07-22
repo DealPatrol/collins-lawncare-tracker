@@ -4,7 +4,9 @@ import {
   haversineMeters, rateColorClass, routeDrags, zoneEconomics,
 } from "../utils.js";
 import { getCurrentCoords } from "../location.js";
-import { IconAlert, IconExternal, IconPin, IconPlus, IconTarget, IconTrash, IconZap } from "../icons.jsx";
+import { formatValueShort } from "../prospecting.js";
+import { ZoneFinder, OutreachSheet } from "./ProspectorTools.jsx";
+import { IconAlert, IconExternal, IconPin, IconPlus, IconSearch, IconSend, IconTarget, IconTrash, IconZap } from "../icons.jsx";
 
 const STATUS_META = {
   new: { label: "New", cls: "badge-blue" },
@@ -24,15 +26,19 @@ function zoneBadge(zone) {
   return { label: `Needs +${zone.yardsToTarget} yard${zone.yardsToTarget === 1 ? "" : "s"}`, cls: "badge-amber" };
 }
 
-function ProspectRow({ prospect, onUpdate, onDelete, onConvert }) {
+function ProspectRow({ prospect, onUpdate, onDelete, onConvert, onMessage }) {
   const meta = STATUS_META[prospect.status] || STATUS_META.new;
   return (
     <div className="list-row" style={{ alignItems: "flex-start" }}>
       <div style={{ flex: 1, minWidth: 0 }}>
         <div style={{ fontWeight: 600, fontSize: 14 }}>{prospect.name}</div>
         <div className="text-faint" style={{ fontSize: 12 }}>
-          {[prospect.address, prospect.targetMonthly ? `target ${formatMoney(prospect.targetMonthly)}/mo` : null]
-            .filter(Boolean).join(" · ") || "Lead"}
+          {[
+            prospect.owner || null,
+            prospect.address !== prospect.name ? prospect.address : null,
+            prospect.value ? formatValueShort(prospect.value) : null,
+            prospect.targetMonthly ? `target ${formatMoney(prospect.targetMonthly)}/mo` : null,
+          ].filter(Boolean).join(" · ") || "Lead"}
         </div>
         <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
           {STATUS_ORDER.map((s) => (
@@ -45,6 +51,9 @@ function ProspectRow({ prospect, onUpdate, onDelete, onConvert }) {
               {STATUS_META[s].label}
             </button>
           ))}
+          <button className="badge badge-blue" style={{ border: "none", cursor: "pointer" }} onClick={() => onMessage(prospect)}>
+            <IconSend size={11} />{prospect.lastContactedAt ? "Message again" : "Message"}
+          </button>
           {prospect.status === "won" && (
             <button className="badge badge-green" style={{ border: "none", cursor: "pointer" }} onClick={() => onConvert(prospect)}>
               <IconPlus size={11} />Add as job
@@ -108,10 +117,13 @@ function AddProspectForm({ defaultCoords, onAdd, onClose }) {
   );
 }
 
-export default function GrowthView({ state, openJob, onAddProspect, onUpdateProspect, onDeleteProspect, onConvertProspect }) {
+export default function GrowthView({ state, openJob, onAddProspect, onUpdateProspect, onDeleteProspect, onConvertProspect, showToast }) {
   const { jobs, settings, prospects = [] } = state;
   const origin = settings.homeCoords || null;
   const [addingIn, setAddingIn] = useState(null); // zone key (anchor id) | "unzoned" | null
+  const [finderIn, setFinderIn] = useState(null); // zone key | null
+  const [outreachId, setOutreachId] = useState(null); // prospect id | null
+  const senderName = state.employees.find((e) => e.id === state.activeEmployeeId)?.name || "";
 
   const zones = clusterJobs(jobs)
     .map((zj) => zoneEconomics(zj, origin))
@@ -205,14 +217,32 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
               ))}
             </div>
             {zoneProspects.map((p) => (
-              <ProspectRow key={p.id} prospect={p} onUpdate={onUpdateProspect} onDelete={onDeleteProspect} onConvert={onConvertProspect} />
+              <ProspectRow key={p.id} prospect={p} onUpdate={onUpdateProspect} onDelete={onDeleteProspect} onConvert={onConvertProspect} onMessage={(pr) => setOutreachId(pr.id)} />
             ))}
+            {finderIn === zoneKey && (
+              <ZoneFinder
+                zone={zone}
+                jobs={jobs}
+                prospects={prospects}
+                token={settings.regridToken}
+                onAddProspect={onAddProspect}
+                showToast={showToast}
+                onClose={() => setFinderIn(null)}
+              />
+            )}
             {addingIn === zoneKey ? (
               <AddProspectForm defaultCoords={zone.centroid} onAdd={onAddProspect} onClose={() => setAddingIn(null)} />
             ) : (
-              <button className="btn btn-ghost btn-sm btn-block" style={{ marginTop: 10 }} onClick={() => setAddingIn(zoneKey)}>
-                <IconPlus size={14} />Log a lead in this zone
-              </button>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                {finderIn !== zoneKey && (
+                  <button className="btn btn-blue btn-sm" style={{ flex: 1 }} onClick={() => setFinderIn(zoneKey)}>
+                    <IconSearch size={14} />Find best houses
+                  </button>
+                )}
+                <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => setAddingIn(zoneKey)}>
+                  <IconPlus size={14} />Log a lead
+                </button>
+              </div>
             )}
           </div>
         );
@@ -224,7 +254,7 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
           Leads outside your current zones. Win 2–3 close together and they become a new zone worth driving to.
         </p>
         {unzonedProspects.map((p) => (
-          <ProspectRow key={p.id} prospect={p} onUpdate={onUpdateProspect} onDelete={onDeleteProspect} onConvert={onConvertProspect} />
+          <ProspectRow key={p.id} prospect={p} onUpdate={onUpdateProspect} onDelete={onDeleteProspect} onConvert={onConvertProspect} onMessage={(pr) => setOutreachId(pr.id)} />
         ))}
         {addingIn === "unzoned" ? (
           <AddProspectForm defaultCoords={null} onAdd={onAddProspect} onClose={() => setAddingIn(null)} />
@@ -267,6 +297,23 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
           <li><b>Be findable in the zone:</b> add these neighborhoods as service areas on your Google Business Profile and post before/afters in the local Facebook and Nextdoor groups.</li>
         </ul>
       </div>
+
+      {(() => {
+        const outreachProspect = outreachId ? prospects.find((p) => p.id === outreachId) : null;
+        if (!outreachProspect) return null;
+        const zone = zoneFor(outreachProspect);
+        return (
+          <OutreachSheet
+            prospect={outreachProspect}
+            yardCount={zone ? zone.jobs.length : jobs.length}
+            senderName={senderName}
+            bizPhone={settings.bizPhone}
+            onUpdate={onUpdateProspect}
+            showToast={showToast}
+            onClose={() => setOutreachId(null)}
+          />
+        );
+      })()}
     </>
   );
 }

@@ -2,7 +2,7 @@ import { useRef, useState } from "react";
 import { exportBackup, parseBackup } from "../store.js";
 import { getCurrentCoords } from "../location.js";
 import { getTodayKey } from "../utils.js";
-import { IconPin, IconDownload, IconUpload, IconTarget } from "../icons.jsx";
+import { IconPin, IconDownload, IconUpload, IconTarget, IconSearch } from "../icons.jsx";
 
 function Toggle({ checked, onChange }) {
   return (
@@ -35,6 +35,8 @@ export default function SettingsView({ state, me, onUpdateSettings, onRestore, o
   const { settings } = state;
   const importRef = useRef(null);
   const [homeAddress, setHomeAddress] = useState(settings.homeAddress);
+  const [regridToken, setRegridToken] = useState(settings.regridToken || "");
+  const [bizPhone, setBizPhone] = useState(settings.bizPhone || "");
 
   const setHomeGps = async () => {
     try {
@@ -114,7 +116,7 @@ export default function SettingsView({ state, me, onUpdateSettings, onRestore, o
           <div className="row-between" style={{ padding: "0 0 12px" }}>
             <div style={{ paddingRight: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 14 }}>Arrival detection</div>
-              <div className="text-faint" style={{ fontSize: 12, marginTop: 2 }}>Suggest starting the timer when you pull up to a pinned yard.</div>
+              <div className="text-faint" style={{ fontSize: 12, marginTop: 2 }}>Automatically start the timer when you pull up to a pinned yard — no tapping needed.</div>
             </div>
             <Toggle checked={settings.autoArriveDetect} onChange={(v) => onUpdateSettings({ autoArriveDetect: v })} />
           </div>
@@ -155,6 +157,38 @@ export default function SettingsView({ state, me, onUpdateSettings, onRestore, o
               Home GPS: {settings.homeCoords.lat.toFixed(4)}, {settings.homeCoords.lng.toFixed(4)}
             </div>
           )}
+        </div>
+
+        {/* Prospector */}
+        <div className="card">
+          <div className="section-title"><IconSearch size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Prospector</div>
+          <p className="text-dim" style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
+            Growth Zones → <b>Find best houses</b> pulls the highest-value properties around your yards from
+            county tax records (owner name, address, assessed value) and writes the outreach message for you.
+            It needs a parcel API key from <b>regrid.com</b> (paid — one won contract covers it many times over).
+          </p>
+          <label className="field-label">Regrid API key</label>
+          <input
+            className="input" placeholder="Paste your Regrid token"
+            value={regridToken} onChange={(e) => setRegridToken(e.target.value)}
+            autoCapitalize="none" autoCorrect="off" spellCheck={false}
+          />
+          <label className="field-label">Business callback number (goes in your messages)</label>
+          <input
+            className="input" type="tel" placeholder="(256) 555-0123"
+            value={bizPhone} onChange={(e) => setBizPhone(e.target.value)}
+          />
+          <button
+            className="btn btn-ghost btn-block"
+            onClick={() => { onUpdateSettings({ regridToken: regridToken.trim(), bizPhone: bizPhone.trim() }); showToast("Prospector settings saved."); }}
+          >
+            Save Prospector Settings
+          </button>
+          <p className="text-faint" style={{ fontSize: 11.5, marginTop: 10, lineHeight: 1.5 }}>
+            Owner names come from public tax records. Homeowner phone numbers don&apos;t — the app never looks
+            those up, because cold-texting looked-up numbers violates the TCPA ($500–$1,500 per text). Cold
+            outreach goes out as a letter or door hanger; texting unlocks when a lead gives you their number.
+          </p>
         </div>
 
         {/* Backup */}

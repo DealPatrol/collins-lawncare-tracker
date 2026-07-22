@@ -1,14 +1,33 @@
 import { useState } from "react";
 import { IconLeaf, IconUsers } from "../icons.jsx";
 
-export default function Onboarding({ employees, onCreate, onPick }) {
+export default function Onboarding({ employees, onCreate, onPick, onJoinCrew }) {
   const [name, setName] = useState("");
   const [role, setRole] = useState("crew");
+  const [joinCode, setJoinCode] = useState("");
+  const [joinMsg, setJoinMsg] = useState(null); // { text, tone }
+  const [showJoin, setShowJoin] = useState(false);
 
   const create = () => {
     if (!name.trim()) return;
     onCreate(name, role);
     setName("");
+  };
+
+  const join = () => {
+    if (!joinCode.trim()) return;
+    try {
+      const { addedJobs, addedEmployees } = onJoinCrew(joinCode);
+      setJoinCode("");
+      setJoinMsg({
+        text: addedJobs || addedEmployees
+          ? `Got it — ${addedJobs} job${addedJobs === 1 ? "" : "s"} and ${addedEmployees} crew member${addedEmployees === 1 ? "" : "s"} added. Pick your name below.`
+          : "That code didn't have anything new in it.",
+        tone: addedJobs || addedEmployees ? "green" : "amber",
+      });
+    } catch (e) {
+      setJoinMsg({ text: e.message || "Invalid invite code.", tone: "red" });
+    }
   };
 
   return (
@@ -21,6 +40,10 @@ export default function Onboarding({ employees, onCreate, onPick }) {
           <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>Collins Lawncare</h1>
           <p className="text-dim" style={{ fontSize: 14, marginTop: 6 }}>Crew tracking, routes & pay — built for the field.</p>
         </div>
+
+        {joinMsg && (
+          <div className={`banner banner-${joinMsg.tone}`} style={{ marginBottom: 14 }}>{joinMsg.text}</div>
+        )}
 
         {employees.length > 0 && (
           <div className="card">
@@ -35,6 +58,28 @@ export default function Onboarding({ employees, onCreate, onPick }) {
               </button>
             ))}
           </div>
+        )}
+
+        {showJoin ? (
+          <div className="card">
+            <div className="section-title">Join a Crew</div>
+            <p className="text-dim" style={{ fontSize: 12.5, marginBottom: 10, lineHeight: 1.5 }}>
+              Paste the invite code your crew manager sent you — it&apos;ll load their job list here.
+            </p>
+            <textarea
+              className="input" rows={3} placeholder="Paste the invite code here"
+              value={joinCode} onChange={(e) => setJoinCode(e.target.value)}
+              style={{ resize: "vertical", fontSize: 12.5 }}
+            />
+            <div style={{ display: "flex", gap: 8 }}>
+              <button className="btn btn-ghost" onClick={() => setShowJoin(false)}>Cancel</button>
+              <button className="btn btn-primary" style={{ flex: 1 }} disabled={!joinCode.trim()} onClick={join}>Join Crew</button>
+            </div>
+          </div>
+        ) : (
+          <button className="btn btn-ghost btn-block" style={{ marginBottom: 14 }} onClick={() => setShowJoin(true)}>
+            <IconUsers size={15} />Have a crew invite code?
+          </button>
         )}
 
         <div className="card">
