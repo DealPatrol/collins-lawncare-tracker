@@ -27,7 +27,6 @@ export default function App() {
   // subview: null | { kind: "detail", jobId } | { kind: "form", jobId? }
   const [subview, setSubview] = useState(null);
   const [toast, setToast] = useState(null); // { text, tone }
-  const [arriveSuggestion, setArriveSuggestion] = useState(null); // job
   const [now, setNow] = useState(0); // shared wall clock, ticks while anything runs
 
   useEffect(() => saveState(state), [state]);
@@ -75,7 +74,6 @@ export default function App() {
       const next = setWorkday(s, meId, { ...day, end: Date.now(), endCoords: coords });
       return { ...next, workdays: pruneWorkdays(next.workdays) };
     });
-    setArriveSuggestion(null);
   };
 
   // ── Jobs ──
@@ -166,7 +164,6 @@ export default function App() {
       }
       return next;
     });
-    setArriveSuggestion(null);
   };
 
   const stopTimer = useCallback((jobId, { auto = false } = {}) => {
@@ -230,10 +227,11 @@ export default function App() {
   }, [meId]);
 
   const onAutoStop = useCallback((job) => stopTimer(job.id, { auto: true }), [stopTimer]);
-  const onArrive = useCallback((job) => {
+  const onArrive = (job) => {
     if (navigator.vibrate) navigator.vibrate(80);
-    setArriveSuggestion(job);
-  }, []);
+    startTimer(job.id);
+    showToast(`Arrived at ${job.name} — timer started automatically.`);
+  };
 
   const { lastFix, gpsError } = useGpsTracking({
     enabled: !!meId && (workdayRunning || !!activeJob),
@@ -269,7 +267,6 @@ export default function App() {
 
   const switchEmployee = (empId) => {
     setState((s) => ({ ...s, activeEmployeeId: empId }));
-    setArriveSuggestion(null);
   };
 
   const restoreState = (next) => {
@@ -331,7 +328,7 @@ export default function App() {
     if (tab === "settings") {
       return <SettingsView {...shared} onUpdateSettings={updateSettings} onRestore={restoreState} onSwitchEmployee={switchEmployee} />;
     }
-    return <TodayView {...shared} arriveSuggestion={arriveSuggestion} onDismissArrive={() => setArriveSuggestion(null)} onGoRoute={() => setTab("route")} />;
+    return <TodayView {...shared} onGoRoute={() => setTab("route")} />;
   };
 
   return (

@@ -116,7 +116,7 @@ export default function SettingsView({ state, me, onUpdateSettings, onRestore, o
           <div className="row-between" style={{ padding: "0 0 12px" }}>
             <div style={{ paddingRight: 12 }}>
               <div style={{ fontWeight: 700, fontSize: 14 }}>Arrival detection</div>
-              <div className="text-faint" style={{ fontSize: 12, marginTop: 2 }}>Suggest starting the timer when you pull up to a pinned yard.</div>
+              <div className="text-faint" style={{ fontSize: 12, marginTop: 2 }}>Automatically start the timer when you pull up to a pinned yard — no tapping needed.</div>
             </div>
             <Toggle checked={settings.autoArriveDetect} onChange={(v) => onUpdateSettings({ autoArriveDetect: v })} />
           </div>
