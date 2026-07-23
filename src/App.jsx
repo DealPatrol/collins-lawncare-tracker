@@ -122,13 +122,15 @@ export default function LawncareTracker() {
   });
   const [onboardingCrewName, setOnboardingCrewName] = useState("");
 
-  const [view, setView] = useState("dashboard"); // dashboard | add | detail | route | settings | priority | analytics | invoice | crew
+  const [view, setView] = useState("dashboard"); // dashboard | add | detail | route | settings | priority | analytics | invoice | crew | billing | clientPortal | reports
   const [selectedJob, setSelectedJob] = useState(null);
   const [crew, setCrew] = useState(loadCrew);
   const [routeOrder, setRouteOrder] = useState([]);
   const [businessInfo, setBusinessInfo] = useState({ name: "Collins Lawncare", phone: "", address: "" });
   const [crewFormName, setCrewFormName] = useState("");
   const [crewFormRole, setCrewFormRole] = useState("Worker");
+  const [gpsLocations, setGpsLocations] = useState([]);
+  const [subscription, setSubscription] = useState({ plan: "free", status: "active", startDate: new Date().toLocaleDateString(), payments: [] });
   const runningOnLoad = getRunningJob(loadJobs());
   const [activeTimer, setActiveTimer] = useState(runningOnLoad?.id ?? null);
   const [timerStart, setTimerStart] = useState(runningOnLoad?.currentSessionStart ?? null);
@@ -251,6 +253,63 @@ export default function LawncareTracker() {
 
   const deleteCrewMember = (crewId) => {
     setCrew(crew.filter(c => c.id !== crewId));
+  };
+
+  const captureGPS = () => {
+    if (navigator.geolocation) {
+      navigator.geolocation.getCurrentPosition(pos => {
+        const { latitude, longitude, accuracy } = pos.coords;
+        const newLocation = {
+          id: Date.now().toString(),
+          lat: latitude,
+          lng: longitude,
+          accuracy,
+          time: new Date().toLocaleTimeString(),
+          date: new Date().toLocaleDateString(),
+          jobId: activeTimer,
+        };
+        setGpsLocations([...gpsLocations, newLocation]);
+      });
+    }
+  };
+
+  // ── STRIPE SUBSCRIPTION ──
+  const upgradeSubscription = (plan) => {
+    const planPrices = { pro: 49, business: 99, enterprise: 199 };
+    const price = planPrices[plan] || 0;
+    
+    setSubscription({
+      plan,
+      status: "active",
+      startDate: new Date().toLocaleDateString(),
+      payments: [...subscription.payments, {
+        id: Date.now().toString(),
+        plan,
+        amount: price,
+        date: new Date().toLocaleDateString(),
+        status: "completed"
+      }]
+    });
+  };
+
+  // ── EXPORT & ANALYTICS ──
+  const exportToCSV = () => {
+    const headers = ["Job Name", "Client", "Sessions", "Revenue", "Hours", "Rate"];
+    const data = jobs.map(j => {
+      const sessions = j.sessions || [];
+      const revenue = sessions.reduce((s, sess) => s + (sess.pay || 0), 0);
+      const hours = sessions.reduce((s, sess) => s + (sess.duration || 0), 0) / 3600;
+      const rate = hours > 0 ? revenue / hours : 0;
+      return [j.name, j.clientName || "", sessions.length, revenue.toFixed(2), hours.toFixed(1), rate.toFixed(0)];
+    });
+
+    const csv = [headers, ...data].map(row => row.join(",")).join("\n");
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const link = document.createElement("a");
+    link.href = url;
+    link.download = `collins-lawncare-${new Date().toLocaleDateString()}.csv`;
+    link.click();
   };
 
   // ── JOB CRUD ──
@@ -603,6 +662,9 @@ export default function LawncareTracker() {
         </div>
 
         <div style={{ padding: "0 16px" }}>
+          <button style={{ ...styles.primaryBtn, background: "#10b981", marginBottom: 8 }} onClick={() => setView("reports")}>
+            📊 Advanced Reports
+          </button>
           <button style={styles.primaryBtn} onClick={() => setView("dashboard")}>✓ Done</button>
         </div>
       </div>
@@ -1000,6 +1062,15 @@ export default function LawncareTracker() {
           </button>
         </div>
         <div style={styles.card}>
+          <div style={styles.sectionTitle}>Billing & Client Access</div>
+          <button style={{ ...styles.primaryBtn, marginBottom: 8 }} onClick={() => setView("billing")}>
+            💳 Manage Subscription
+          </button>
+          <button style={{ ...styles.primaryBtn, marginBottom: 0, background: "#f3e8ff", color: "#7e22ce" }} onClick={() => setView("clientPortal")}>
+            👁️ Preview Client Portal
+          </button>
+        </div>
+        <div style={styles.card}>
           <div style={styles.sectionTitle}>Legal</div>
           <div style={{ display: "flex", gap: 12, flexDirection: "column" }}>
             <a href="docs/privacy.html" target="_blank" rel="noopener noreferrer" 
@@ -1013,6 +1084,201 @@ export default function LawncareTracker() {
           </div>
         </div>
         {geoError && <div style={{ color: "#4ade80", fontSize: 12, margin: "0 16px", textAlign: "center" }}>{geoError}</div>}
+      </div>
+    );
+  }
+
+  // ── BILLING & SUBSCRIPTIONS ──
+  if (view === "billing") {
+    return (
+      <div style={styles.page}>
+        <div style={styles.header}>
+          <button style={styles.backBtn} onClick={() => setView("settings")}>Back</button>
+          <h1 style={styles.headerTitle}>Billing</h1>
+          <div style={{ width: 40 }} />
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Current Plan</div>
+          <div style={{ padding: "16px 0", textAlign: "center" }}>
+            <div style={{ fontSize: 24, fontWeight: 700, color: "#22c55e", marginBottom: 8, textTransform: "capitalize" }}>
+              {subscription.plan || "Free"} Plan
+            </div>
+            <div style={{ color: "#64748b", marginBottom: 12 }}>
+              Active since {subscription.startDate}
+            </div>
+            <div style={{ background: "#f1f5f9", borderRadius: 8, padding: 12, color: "#1e293b", fontSize: 13, marginBottom: 16 }}>
+              Total spent: ${subscription.payments.reduce((s, p) => s + p.amount, 0).toFixed(2)}
+            </div>
+          </div>
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Upgrade Plan</div>
+          {["pro", "business", "enterprise"].map(plan => (
+            <div key={plan} style={{ marginBottom: 12, padding: "12px", borderRadius: 8, border: "1px solid #e2e8f0", textAlign: "center" }}>
+              <div style={{ fontWeight: 600, color: "#1e293b", marginBottom: 4, textTransform: "capitalize" }}>{plan} - ${plan === "pro" ? "49" : plan === "business" ? "99" : "199"}/mo</div>
+              <button style={{ ...styles.primaryBtn, padding: "8px 16px", fontSize: 12 }}
+                onClick={() => upgradeSubscription(plan)} disabled={subscription.plan === plan}>
+                {subscription.plan === plan ? "Current Plan" : "Upgrade"}
+              </button>
+            </div>
+          ))}
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Payment History</div>
+          {subscription.payments.length === 0 ? (
+            <div style={styles.empty}>No payments yet</div>
+          ) : (
+            subscription.payments.map(p => (
+              <div key={p.id} style={{ padding: "10px 0", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between" }}>
+                <div>
+                  <div style={{ fontWeight: 600, color: "#1e293b", textTransform: "capitalize" }}>{p.plan}</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>{p.date}</div>
+                </div>
+                <div style={{ fontWeight: 700, color: "#22c55e" }}>${p.amount.toFixed(2)}</div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ padding: "0 16px" }}>
+          <button style={styles.primaryBtn} onClick={() => setView("settings")}>Back to Settings</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── ADVANCED REPORTS ──
+  if (view === "reports") {
+    const totalRevenue = jobs.reduce((sum, j) => sum + (j.sessions || []).reduce((s, sess) => s + (sess.pay || 0), 0), 0);
+    const jobsData = jobs.map(j => {
+      const sessions = j.sessions || [];
+      const revenue = sessions.reduce((s, sess) => s + (sess.pay || 0), 0);
+      const hours = sessions.reduce((s, sess) => s + (sess.duration || 0), 0) / 3600;
+      return { name: j.name, revenue, hours, profitability: revenue / (hours || 1) };
+    }).sort((a, b) => b.revenue - a.revenue);
+
+    const crewData = crew.map(c => ({ name: c.name, earnings: c.totalEarnings, hours: c.totalHours, jobs: c.jobsCompleted }));
+
+    return (
+      <div style={styles.page}>
+        <div style={styles.header}>
+          <button style={styles.backBtn} onClick={() => setView("dashboard")}>Back</button>
+          <h1 style={styles.headerTitle}>Reports</h1>
+          <div style={{ width: 40 }} />
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Export Data</div>
+          <button style={{ ...styles.primaryBtn, background: "#10b981" }} onClick={exportToCSV}>
+            Download CSV Report
+          </button>
+          <div style={{ fontSize: 12, color: "#64748b", marginTop: 8, textAlign: "center" }}>
+            Includes all jobs, revenue, and crew data
+          </div>
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Top Performing Jobs</div>
+          {jobsData.length === 0 ? (
+            <div style={styles.empty}>No job data available</div>
+          ) : (
+            jobsData.slice(0, 5).map((job, idx) => (
+              <div key={idx} style={{ padding: "12px 0", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                <div>
+                  <div style={{ fontWeight: 600, color: "#1e293b" }}>{idx + 1}. {job.name}</div>
+                  <div style={{ fontSize: 12, color: "#64748b" }}>{job.hours.toFixed(1)}h worked</div>
+                </div>
+                <div style={{ textAlign: "right" }}>
+                  <div style={{ fontWeight: 700, color: "#22c55e" }}>${job.revenue.toFixed(2)}</div>
+                  <div style={{ fontSize: 11, color: "#64748b" }}>${job.profitability.toFixed(0)}/h</div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Crew Performance</div>
+          {crewData.length === 0 ? (
+            <div style={styles.empty}>No crew members yet</div>
+          ) : (
+            crewData.map((member, idx) => (
+              <div key={idx} style={{ padding: "12px 0", borderBottom: "1px solid #e2e8f0" }}>
+                <div style={{ fontWeight: 600, color: "#1e293b", marginBottom: 4 }}>{member.name}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, fontSize: 12 }}>
+                  <div style={{ background: "#f1f5f9", padding: 8, borderRadius: 4, textAlign: "center" }}>
+                    <div style={{ color: "#64748b" }}>Earnings</div>
+                    <div style={{ fontWeight: 700, color: "#22c55e" }}>${member.earnings.toFixed(2)}</div>
+                  </div>
+                  <div style={{ background: "#f1f5f9", padding: 8, borderRadius: 4, textAlign: "center" }}>
+                    <div style={{ color: "#64748b" }}>Hours</div>
+                    <div style={{ fontWeight: 700 }}>{member.hours.toFixed(1)}</div>
+                  </div>
+                  <div style={{ background: "#f1f5f9", padding: 8, borderRadius: 4, textAlign: "center" }}>
+                    <div style={{ color: "#64748b" }}>Jobs</div>
+                    <div style={{ fontWeight: 700 }}>{member.jobs}</div>
+                  </div>
+                </div>
+              </div>
+            ))
+          )}
+        </div>
+
+        <div style={{ padding: "0 16px" }}>
+          <button style={styles.primaryBtn} onClick={() => setView("dashboard")}>Back to Dashboard</button>
+        </div>
+      </div>
+    );
+  }
+
+  // ── CLIENT PORTAL ──
+  if (view === "clientPortal") {
+    const clientJobs = jobs.filter(j => j.clientName);
+    return (
+      <div style={styles.page}>
+        <div style={{ ...styles.header, background: "#f1f5f9" }}>
+          <div />
+          <h1 style={styles.headerTitle}>Your Jobs</h1>
+          <button style={styles.backBtn} onClick={() => setView("dashboard")}>Exit</button>
+        </div>
+
+        {clientJobs.length === 0 ? (
+          <div style={{ textAlign: "center", padding: "60px 20px", color: "#94a3b8" }}>
+            <div style={{ fontSize: 14 }}>No active jobs to display</div>
+          </div>
+        ) : (
+          <div>
+            {clientJobs.map(job => (
+              <div key={job.id} style={styles.card}>
+                <div style={{ fontWeight: 700, fontSize: 16, color: "#1e293b", marginBottom: 8 }}>{job.name}</div>
+                <div style={{ color: "#64748b", fontSize: 13, marginBottom: 8 }}>{job.address}</div>
+                <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8, marginBottom: 12 }}>
+                  <div style={{ background: "#f1f5f9", padding: 8, borderRadius: 6, textAlign: "center", fontSize: 12 }}>
+                    <div style={{ color: "#64748b" }}>Sessions</div>
+                    <div style={{ fontWeight: 700, color: "#22c55e" }}>{(job.sessions || []).length}</div>
+                  </div>
+                  <div style={{ background: "#f1f5f9", padding: 8, borderRadius: 6, textAlign: "center", fontSize: 12 }}>
+                    <div style={{ color: "#64748b" }}>Total</div>
+                    <div style={{ fontWeight: 700, color: "#22c55e" }}>${job.pay}</div>
+                  </div>
+                </div>
+                {(job.photos || []).length > 0 && (
+                  <div>
+                    <div style={{ fontSize: 12, fontWeight: 600, color: "#475569", marginBottom: 8 }}>Gallery ({(job.photos || []).length})</div>
+                    <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 8 }}>
+                      {(job.photos || []).slice(0, 4).map((photo, idx) => (
+                        <img key={idx} src={photo} alt="Work" style={{ width: "100%", height: 80, objectFit: "cover", borderRadius: 6 }} />
+                      ))}
+                    </div>
+                  </div>
+                )}
+              </div>
+            ))}
+          </div>
+        )}
       </div>
     );
   }
@@ -1320,9 +1586,14 @@ export default function LawncareTracker() {
             </button>
           )}
           {workdayRunning && (
-            <button style={{ ...styles.stopBtn, padding: "8px 14px", fontSize: 13 }} onClick={endWorkday}>
-              🏠 Home
-            </button>
+            <div style={{ display: "flex", gap: 8 }}>
+              <button style={{ ...styles.stopBtn, padding: "8px 14px", fontSize: 13, flex: 1 }} onClick={endWorkday}>
+                🏠 Home
+              </button>
+              <button style={{ ...styles.checkBtn, padding: "8px 14px", fontSize: 13, background: "#e0f2fe", color: "#0369a1" }} onClick={captureGPS}>
+                📍 GPS
+              </button>
+            </div>
           )}
           {workdayDone && (
             <button style={{ ...styles.checkBtn, background: "#e2e8f0", border: "1px solid #374151", fontSize: 12 }} onClick={resetWorkday}>
