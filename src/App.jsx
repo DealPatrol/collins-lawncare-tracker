@@ -7,7 +7,16 @@ const HOME_KEY = "collins_home";
 const HOME_COORDS_KEY = "collins_home_coords";
 const CREW_NAME_KEY = "collins_crew_name";
 const ONBOARDED_KEY = "collins_onboarded";
+const CREW_KEY = "collins_crew_members";
 const DEFAULT_CENTER = { lat: 34.0632, lng: -86.7686 };
+
+function loadCrew() {
+  try { return JSON.parse(localStorage.getItem(CREW_KEY)) || []; } catch { return []; }
+}
+
+function saveCrew(crew) {
+  localStorage.setItem(CREW_KEY, JSON.stringify(crew));
+}
 
 function getWeekKey(date = new Date()) {
   const d = new Date(date);
@@ -113,10 +122,13 @@ export default function LawncareTracker() {
   });
   const [onboardingCrewName, setOnboardingCrewName] = useState("");
 
-  const [view, setView] = useState("dashboard"); // dashboard | add | detail | route | settings | priority | analytics | invoice
+  const [view, setView] = useState("dashboard"); // dashboard | add | detail | route | settings | priority | analytics | invoice | crew
   const [selectedJob, setSelectedJob] = useState(null);
+  const [crew, setCrew] = useState(loadCrew);
   const [routeOrder, setRouteOrder] = useState([]);
   const [businessInfo, setBusinessInfo] = useState({ name: "Collins Lawncare", phone: "", address: "" });
+  const [crewFormName, setCrewFormName] = useState("");
+  const [crewFormRole, setCrewFormRole] = useState("Worker");
   const runningOnLoad = getRunningJob(loadJobs());
   const [activeTimer, setActiveTimer] = useState(runningOnLoad?.id ?? null);
   const [timerStart, setTimerStart] = useState(runningOnLoad?.currentSessionStart ?? null);
@@ -161,6 +173,11 @@ export default function LawncareTracker() {
       localStorage.setItem(CREW_NAME_KEY, crewName);
     }
   }, [crewName]);
+
+  // Persist crew members
+  useEffect(() => {
+    saveCrew(crew);
+  }, [crew]);
 
 
   useEffect(() => {
@@ -213,6 +230,27 @@ export default function LawncareTracker() {
   const resetWorkday = () => {
     setWorkday(null);
     setDayElapsed(0);
+  };
+
+  // ── CREW MANAGEMENT ──
+  const addCrewMember = () => {
+    if (!crewFormName.trim()) return;
+    const newMember = {
+      id: Date.now().toString(),
+      name: crewFormName.trim(),
+      role: crewFormRole,
+      addedDate: new Date().toLocaleDateString(),
+      totalEarnings: 0,
+      totalHours: 0,
+      jobsCompleted: 0,
+    };
+    setCrew([...crew, newMember]);
+    setCrewFormName("");
+    setCrewFormRole("Worker");
+  };
+
+  const deleteCrewMember = (crewId) => {
+    setCrew(crew.filter(c => c.id !== crewId));
   };
 
   // ── JOB CRUD ──
@@ -979,6 +1017,66 @@ export default function LawncareTracker() {
     );
   }
 
+  // ── CREW MANAGEMENT ──
+  if (view === "crew") {
+    return (
+      <div style={styles.page}>
+        <div style={styles.header}>
+          <button style={styles.backBtn} onClick={() => setView("dashboard")}>Back</button>
+          <h1 style={styles.headerTitle}>Manage Crew</h1>
+          <div style={{ width: 40 }} />
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Add Crew Member</div>
+          <label style={styles.label}>Name</label>
+          <input style={styles.input} placeholder="e.g., John, Maria..." value={crewFormName}
+            onChange={e => setCrewFormName(e.target.value)} />
+          <label style={styles.label}>Role</label>
+          <select style={styles.input} value={crewFormRole} onChange={e => setCrewFormRole(e.target.value)}>
+            <option value="Worker">Worker</option>
+            <option value="Supervisor">Supervisor</option>
+            <option value="Manager">Manager</option>
+          </select>
+          <button style={{ ...styles.primaryBtn, opacity: crewFormName.trim() ? 1 : 0.5, cursor: crewFormName.trim() ? "pointer" : "not-allowed" }}
+            onClick={addCrewMember}>
+            Add Member
+          </button>
+        </div>
+
+        <div style={styles.card}>
+          <div style={styles.sectionTitle}>Crew Members ({crew.length})</div>
+          {crew.length === 0 ? (
+            <div style={styles.empty}>No crew members yet. Add your first team member above.</div>
+          ) : (
+            <div>
+              {crew.map(member => (
+                <div key={member.id} style={{ padding: "14px 0", borderBottom: "1px solid #e2e8f0", display: "flex", justifyContent: "space-between", alignItems: "center" }}>
+                  <div>
+                    <div style={{ fontWeight: 600, color: "#1e293b", marginBottom: 4 }}>{member.name}</div>
+                    <div style={{ fontSize: 12, color: "#64748b", marginBottom: 2 }}>Role: {member.role}</div>
+                    <div style={{ fontSize: 11, color: "#64748b" }}>Joined {member.addedDate}</div>
+                    <div style={{ fontSize: 11, color: "#22c55e", marginTop: 4, fontWeight: 600 }}>
+                      Earned: ${member.totalEarnings.toFixed(2)} | {member.totalHours.toFixed(1)}h | {member.jobsCompleted} jobs
+                    </div>
+                  </div>
+                  <button style={{ ...styles.deleteBtn, margin: 0, padding: "6px 12px", fontSize: 12 }}
+                    onClick={() => deleteCrewMember(member.id)}>
+                    Remove
+                  </button>
+                </div>
+              ))}
+            </div>
+          )}
+        </div>
+
+        <div style={{ padding: "0 16px" }}>
+          <button style={styles.primaryBtn} onClick={() => setView("dashboard")}>Back to Dashboard</button>
+        </div>
+      </div>
+    );
+  }
+
   // ── ADD / EDIT JOB FORM ──
   if (view === "add" || (view === "detail" && editingId)) {
     const isEdit = !!editingId;
@@ -1320,6 +1418,7 @@ export default function LawncareTracker() {
       {/* Bottom nav hint */}
       <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "20px 12px 8px", borderTop: "1px solid #e2e8f0", marginTop: 16, flexWrap: "wrap" }}>
         <button style={styles.navBtn} onClick={() => setView("priority")}>📋 Priority</button>
+        <button style={styles.navBtn} onClick={() => setView("crew")}>👥 Crew</button>
         <button style={styles.navBtn} onClick={() => setView("route")}>🗺 Route</button>
         <button style={styles.navBtn} onClick={() => setView("analytics")}>📊 Analytics</button>
         <button style={styles.navBtn} onClick={() => setView("invoice")}>🧾 Invoice</button>
