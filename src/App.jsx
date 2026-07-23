@@ -452,12 +452,13 @@ export default function LawncareTracker() {
             return (
               <div key={job.id} style={{
                 ...styles.routeJobRow,
-                background: "#0d1117",
+                background: "#fff",
                 padding: "12px 10px",
                 marginBottom: 8,
                 borderRadius: 8,
                 borderLeft: `3px solid ${getPriorityColor(job.priority)}`,
-                cursor: "grab"
+                cursor: "grab",
+                border: "1px solid #e2e8f0"
               }}>
                 <div style={{ fontSize: 12, fontWeight: 600, color: "#64748b", minWidth: 30 }}>#{orderedIdx + 1}</div>
                 <div style={{ flex: 1 }}>
@@ -468,11 +469,11 @@ export default function LawncareTracker() {
                 </div>
                 <div style={{ display: "flex", gap: 6 }}>
                   {orderedIdx > 0 && (
-                    <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", padding: "4px 8px", fontSize: 11 }}
+                    <button style={{ ...styles.checkBtn, background: "#e2e8f0", border: "1px solid #374151", padding: "4px 8px", fontSize: 11 }}
                       onClick={() => reorderJobs(orderedIdx, orderedIdx - 1)}>↑</button>
                   )}
                   {orderedIdx < orderedJobs.length - 1 && (
-                    <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", padding: "4px 8px", fontSize: 11 }}
+                    <button style={{ ...styles.checkBtn, background: "#e2e8f0", border: "1px solid #374151", padding: "4px 8px", fontSize: 11 }}
                       onClick={() => reorderJobs(orderedIdx, orderedIdx + 1)}>↓</button>
                   )}
                 </div>
@@ -540,7 +541,7 @@ export default function LawncareTracker() {
             </div>
             <div>
               <div style={{ fontSize: 12, color: "#64748b" }}>Avg Time/Job</div>
-              <div style={{ fontSize: 24, fontWeight: 700, color: "#00d2ef" }}>{avgTimePerJob.toFixed(0)}m</div>
+              <div style={{ fontSize: 24, fontWeight: 700, color: "#22c55e" }}>{avgTimePerJob.toFixed(0)}m</div>
             </div>
           </div>
         </div>
@@ -549,7 +550,7 @@ export default function LawncareTracker() {
           <div style={styles.sectionTitle}>Job Performance</div>
           {jobStats.length === 0 && <div style={styles.empty}>No session data yet</div>}
           {jobStats.map(stat => (
-            <div key={stat.id} style={{ padding: "12px 0", borderBottom: "1px solid #1e2a38" }}>
+            <div key={stat.id} style={{ padding: "12px 0", borderBottom: "1px solid #e2e8f0" }}>
               <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: 8 }}>
                 <div style={{ fontWeight: 600 }}>{stat.name}</div>
                 <div style={{ color: "#4ade80", fontWeight: 600 }}>{formatMoney(stat.revenue)}</div>
@@ -595,7 +596,7 @@ export default function LawncareTracker() {
             .company h1 { font-size: 24px; margin-bottom: 5px; }
             .company p { font-size: 12px; color: #666; }
             .invoice-title { text-align: right; }
-            .invoice-title h2 { font-size: 28px; margin-bottom: 10px; color: #00d2ef; }
+            .invoice-title h2 { font-size: 28px; margin-bottom: 10px; color: #22c55e; }
             .invoice-title p { font-size: 12px; color: #666; margin: 2px 0; }
             .details { display: grid; grid-template-columns: 1fr 1fr; gap: 30px; margin-bottom: 30px; }
             .detail-block h3 { font-size: 12px; color: #666; text-transform: uppercase; margin-bottom: 8px; font-weight: bold; }
@@ -607,7 +608,7 @@ export default function LawncareTracker() {
             .total-row { display: grid; grid-template-columns: 1fr 150px; gap: 20px; justify-items: end; margin-bottom: 30px; }
             .total-row div { font-size: 14px; }
             .total-row .label { text-align: right; }
-            .total-row .amount { font-weight: bold; font-size: 18px; color: #00d2ef; }
+            .total-row .amount { font-weight: bold; font-size: 18px; color: #22c55e; }
             .notes { background: #f9f9f9; padding: 15px; border-radius: 4px; font-size: 12px; line-height: 1.5; color: #666; margin-bottom: 20px; }
             .footer { text-align: center; font-size: 11px; color: #999; border-top: 1px solid #ddd; padding-top: 15px; }
             @media print { body { background: white; } .container { border: none; box-shadow: none; } }
@@ -728,7 +729,7 @@ export default function LawncareTracker() {
                     </div>
                     <div style={styles.jobCardRight}>
                       <div style={{ color: "#4ade80", fontWeight: 600 }}>{formatMoney(revenue)}</div>
-                      <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", fontSize: 11 }}>
+                      <button style={{ ...styles.checkBtn, background: "#e2e8f0", border: "1px solid #374151", fontSize: 11 }}>
                         Generate →
                       </button>
                     </div>
@@ -789,7 +790,7 @@ export default function LawncareTracker() {
                     {stop.duration && ` · ${formatDuration(stop.duration)}`}
                   </div>
                 </div>
-                <div style={{ color: "#00d2ef", fontWeight: 700, fontSize: 13 }}>
+                <div style={{ color: "#22c55e", fontWeight: 700, fontSize: 13 }}>
                   {stop.duration ? formatDuration(stop.duration) : "—"}
                 </div>
               </div>
@@ -803,7 +804,7 @@ export default function LawncareTracker() {
           {jobs.length === 0 && <div style={styles.empty}>No jobs added yet</div>}
           {jobs.map((j, i) => (
             <div key={j.id} style={styles.routeJobRow}>
-              <div style={{ ...styles.routeNumBadge, background: isMowedThisWeek(j) ? "#166534" : "#1e2a38" }}>
+              <div style={{ ...styles.routeNumBadge, background: isMowedThisWeek(j) ? "#16a34a" : "#e2e8f0" }}>
                 {i + 1}
               </div>
               <div style={{ flex: 1 }}>
@@ -815,7 +816,7 @@ export default function LawncareTracker() {
                 <div style={{ color: isMowedThisWeek(j) ? "#4ade80" : "#94a3b8", fontSize: 12 }}>
                   {isMowedThisWeek(j) ? "✅ Done" : "Pending"}
                 </div>
-                <div style={{ color: "#00d2ef", fontSize: 13, fontWeight: 600 }}>{formatMoney(j.pay)}</div>
+                <div style={{ color: "#22c55e", fontSize: 13, fontWeight: 600 }}>{formatMoney(j.pay)}</div>
               </div>
             </div>
           ))}
@@ -833,7 +834,7 @@ export default function LawncareTracker() {
         {/* Embed OpenStreetMap for visual reference */}
         <div style={{ padding: "12px 16px 0" }}>
           <div style={styles.sectionTitle}>Map Preview</div>
-          <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #1e2a38" }}>
+          <div style={{ borderRadius: 12, overflow: "hidden", border: "1px solid #e2e8f0" }}>
             <iframe
               title="Route Map"
               width="100%"
@@ -924,7 +925,7 @@ export default function LawncareTracker() {
             localStorage.setItem(HOME_KEY, homeAddress);
             setGeoError("Address saved!");
           }}>Save Address</button>
-          <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", width: "100%", marginBottom: 0 }}
+          <button style={{ ...styles.checkBtn, background: "#e2e8f0", border: "1px solid #374151", width: "100%", marginBottom: 0 }}
             onClick={() => getLocation((c) => {
               setHomeCoords(c);
               localStorage.setItem(HOME_COORDS_KEY, JSON.stringify(c));
@@ -955,7 +956,7 @@ export default function LawncareTracker() {
               e.target.value = "";
             }}
           />
-          <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", width: "100%", marginBottom: 0 }}
+          <button style={{ ...styles.checkBtn, background: "#e2e8f0", border: "1px solid #374151", width: "100%", marginBottom: 0 }}
             onClick={() => importInputRef.current?.click()}>
             ⬆ Restore from Backup
           </button>
@@ -964,11 +965,11 @@ export default function LawncareTracker() {
           <div style={styles.sectionTitle}>Legal</div>
           <div style={{ display: "flex", gap: 12, flexDirection: "column" }}>
             <a href="docs/privacy.html" target="_blank" rel="noopener noreferrer" 
-              style={{ color: "#00d2ef", textDecoration: "none", fontSize: 13, padding: "10px 0", borderBottom: "1px solid #1e2a38", paddingBottom: 10 }}>
+              style={{ color: "#22c55e", textDecoration: "none", fontSize: 13, padding: "10px 0", borderBottom: "1px solid #e2e8f0", paddingBottom: 10 }}>
               📋 Privacy Policy
             </a>
             <a href="docs/terms.html" target="_blank" rel="noopener noreferrer"
-              style={{ color: "#00d2ef", textDecoration: "none", fontSize: 13, padding: "10px 0" }}>
+              style={{ color: "#22c55e", textDecoration: "none", fontSize: 13, padding: "10px 0" }}>
               ⚖️ Terms of Service
             </a>
           </div>
@@ -1028,7 +1029,7 @@ export default function LawncareTracker() {
                 onChange={e => setForm(f => ({ ...f, lng: e.target.value }))} />
             </div>
           </div>
-          <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", width: "100%", marginBottom: 12 }}
+          <button style={{ ...styles.checkBtn, background: "#e2e8f0", border: "1px solid #374151", width: "100%", marginBottom: 12 }}
             onClick={() => getLocation((c) => setForm(f => ({ ...f, lat: c.lat.toFixed(5), lng: c.lng.toFixed(5) })))}>
             📍 Use Current GPS for Coords
           </button>
@@ -1095,7 +1096,7 @@ export default function LawncareTracker() {
               <div style={styles.label}>This Week</div>
               <div style={{ fontSize: 13, color: mowed ? "#4ade80" : "#f87171" }}>{mowed ? "✅ Mowed" : "❌ Not yet"}</div>
             </div>
-            <button style={{ ...styles.checkBtn, background: mowed ? "#166534" : "#14532d", border: `1px solid ${mowed ? "#4ade80" : "#555"}` }}
+            <button style={{ ...styles.checkBtn, background: mowed ? "#16a34a" : "#14532d", border: `1px solid ${mowed ? "#4ade80" : "#555"}` }}
               onClick={() => toggleMow(job.id)}>
               {mowed ? "Unmark" : "Mark Mowed"}
             </button>
@@ -1130,7 +1131,7 @@ export default function LawncareTracker() {
           {(job.photos || []).length > 0 && (
             <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr", gap: 10, marginBottom: 12 }}>
               {(job.photos || []).map((photo, idx) => (
-                <div key={idx} style={{ position: "relative", borderRadius: 8, overflow: "hidden", background: "#1e2a38" }}>
+                <div key={idx} style={{ position: "relative", borderRadius: 8, overflow: "hidden", background: "#e2e8f0" }}>
                   <img src={photo} alt={`Photo ${idx + 1}`} style={{ width: "100%", height: 120, objectFit: "cover" }} />
                   <button style={{ position: "absolute", top: 4, right: 4, background: "#f87171", border: "none", borderRadius: 4, padding: "4px 8px", fontSize: 11, cursor: "pointer", fontWeight: 600 }}
                     onClick={() => {
@@ -1170,7 +1171,7 @@ export default function LawncareTracker() {
                 {s.location && <div style={{ color: "#64748b", fontSize: 11 }}>📍 GPS logged</div>}
               </div>
               <div style={{ textAlign: "right" }}>
-                <div style={{ color: "#00d2ef", fontWeight: 600 }}>{formatDuration(s.duration)}</div>
+                <div style={{ color: "#22c55e", fontWeight: 600 }}>{formatDuration(s.duration)}</div>
                 <div style={{ color: "#94a3b8", fontSize: 12 }}>{formatMoney(s.pay)}</div>
               </div>
             </div>
@@ -1178,7 +1179,7 @@ export default function LawncareTracker() {
           {!!(job.sessions || []).length && (
             <div style={styles.totalRow}>
               <span>Total time</span>
-              <span style={{ color: "#00d2ef" }}>{formatDuration(totalSec)}</span>
+              <span style={{ color: "#22c55e" }}>{formatDuration(totalSec)}</span>
             </div>
           )}
         </div>
@@ -1205,7 +1206,7 @@ export default function LawncareTracker() {
       </div>
 
       {/* ── WORKDAY CLOCK ── */}
-      <div style={{ ...styles.card, marginTop: 12, background: workdayRunning ? "#0c1a10" : workdayDone ? "#0c1020" : "#161b22", border: `1px solid ${workdayRunning ? "#166534" : workdayDone ? "#1e3a5f" : "#1e2a38"}` }}>
+      <div style={{ ...styles.card, marginTop: 12, background: workdayRunning ? "#dcfce7" : workdayDone ? "#fef3c7" : "#161b22", border: `1px solid ${workdayRunning ? "#16a34a" : workdayDone ? "#bfdbfe" : "#e2e8f0"}` }}>
         <div style={{ display: "flex", justifyContent: "space-between", alignItems: "center", marginBottom: workdayRunning || workdayDone ? 10 : 0 }}>
           <div>
             <div style={{ fontWeight: 700, fontSize: 13, color: workdayRunning ? "#4ade80" : workdayDone ? "#60a5fa" : "#94a3b8" }}>
@@ -1226,7 +1227,7 @@ export default function LawncareTracker() {
             </button>
           )}
           {workdayDone && (
-            <button style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", fontSize: 12 }} onClick={resetWorkday}>
+            <button style={{ ...styles.checkBtn, background: "#e2e8f0", border: "1px solid #374151", fontSize: 12 }} onClick={resetWorkday}>
               Reset
             </button>
           )}
@@ -1317,7 +1318,7 @@ export default function LawncareTracker() {
       )}
 
       {/* Bottom nav hint */}
-      <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "20px 12px 8px", borderTop: "1px solid #1e2a38", marginTop: 16, flexWrap: "wrap" }}>
+      <div style={{ display: "flex", justifyContent: "center", gap: 12, padding: "20px 12px 8px", borderTop: "1px solid #e2e8f0", marginTop: 16, flexWrap: "wrap" }}>
         <button style={styles.navBtn} onClick={() => setView("priority")}>📋 Priority</button>
         <button style={styles.navBtn} onClick={() => setView("route")}>🗺 Route</button>
         <button style={styles.navBtn} onClick={() => setView("analytics")}>📊 Analytics</button>
@@ -1329,60 +1330,60 @@ export default function LawncareTracker() {
 }
 
 const styles = {
-  page: { background: "#0d1117", minHeight: "100vh", color: "#e2e8f0", fontFamily: "'Inter', system-ui, sans-serif", paddingBottom: "max(40px, env(safe-area-inset-bottom))" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 16px 12px", borderBottom: "1px solid #1e2a38" },
-  brand: { fontSize: 17, fontWeight: 700, color: "#fff", letterSpacing: "-0.3px" },
+  page: { background: "#f8fafb", minHeight: "100vh", color: "#1e293b", fontFamily: "'Inter', system-ui, sans-serif", paddingBottom: "max(40px, env(safe-area-inset-bottom))" },
+  header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 16px 12px", borderBottom: "1px solid #e2e8f0", background: "#fff" },
+  brand: { fontSize: 17, fontWeight: 700, color: "#22c55e", letterSpacing: "-0.3px" },
   subBrand: { fontSize: 10, color: "#64748b", marginTop: 1 },
-  headerTitle: { fontSize: 16, fontWeight: 600, color: "#fff", margin: 0 },
-  addBtn: { background: "#00d2ef", color: "#0d1117", border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" },
-  iconBtn: { background: "none", border: "1px solid #1e2a38", borderRadius: 8, padding: "6px 10px", fontSize: 15, cursor: "pointer" },
-  backBtn: { background: "none", border: "none", color: "#00d2ef", fontSize: 14, cursor: "pointer", padding: 0 },
-  editBtn: { background: "none", border: "1px solid #374151", color: "#94a3b8", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" },
+  headerTitle: { fontSize: 16, fontWeight: 600, color: "#1e293b", margin: 0 },
+  addBtn: { background: "#22c55e", color: "#fff", border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" },
+  iconBtn: { background: "#fff", border: "1px solid #e2e8f0", borderRadius: 8, padding: "6px 10px", fontSize: 15, cursor: "pointer", color: "#1e293b" },
+  backBtn: { background: "none", border: "none", color: "#22c55e", fontSize: 14, cursor: "pointer", padding: 0 },
+  editBtn: { background: "none", border: "1px solid #cbd5e1", color: "#64748b", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" },
   summaryRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "10px 16px" },
-  summaryCard: { background: "#161b22", borderRadius: 10, padding: "10px 6px", textAlign: "center" },
-  summaryVal: { fontSize: 17, fontWeight: 700, color: "#00d2ef" },
+  summaryCard: { background: "#fff", borderRadius: 10, padding: "10px 6px", textAlign: "center", border: "1px solid #e2e8f0" },
+  summaryVal: { fontSize: 17, fontWeight: 700, color: "#22c55e" },
   summaryLbl: { fontSize: 9, color: "#64748b", marginTop: 3, lineHeight: 1.3 },
-  activeTimerBanner: { background: "#1c1200", border: "1px solid #854d0e", borderRadius: 8, margin: "0 16px 8px", padding: "10px 14px", color: "#fbbf24", fontSize: 13 },
+  activeTimerBanner: { background: "#fef3c7", border: "1px solid #f59e0b", borderRadius: 8, margin: "0 16px 8px", padding: "10px 14px", color: "#92400e", fontSize: 13 },
   jobList: { padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 },
-  jobCard: { background: "#161b22", borderRadius: 10, padding: "13px 14px", display: "flex", justifyContent: "space-between", cursor: "pointer" },
+  jobCard: { background: "#fff", borderRadius: 10, padding: "13px 14px", display: "flex", justifyContent: "space-between", cursor: "pointer", border: "1px solid #e2e8f0", boxShadow: "0 1px 2px rgba(0,0,0,0.04)" },
   jobCardLeft: { flex: 1 },
   jobCardRight: { textAlign: "right", minWidth: 70 },
-  jobName: { fontWeight: 600, fontSize: 15, color: "#fff", marginBottom: 2 },
+  jobName: { fontWeight: 600, fontSize: 15, color: "#1e293b", marginBottom: 2 },
   jobAddr: { fontSize: 11, color: "#64748b", marginBottom: 3 },
-  jobMeta: { fontSize: 12, color: "#94a3b8" },
-  jobPay: { fontWeight: 700, color: "#00d2ef", fontSize: 15 },
+  jobMeta: { fontSize: 12, color: "#78909c" },
+  jobPay: { fontWeight: 700, color: "#22c55e", fontSize: 15 },
   jobSessions: { fontSize: 11, color: "#64748b", marginTop: 3 },
-  emptyState: { textAlign: "center", padding: "50px 20px" },
-  card: { background: "#161b22", borderRadius: 12, padding: 16, margin: "0 16px 10px" },
-  label: { fontSize: 12, color: "#94a3b8", marginBottom: 5, display: "block", fontWeight: 500 },
-  input: { width: "100%", background: "#0d1117", border: "1px solid #2a2a2a", borderRadius: 8, color: "#e2e8f0", fontSize: 14, padding: "10px 12px", marginBottom: 12, boxSizing: "border-box", fontFamily: "inherit" },
-  primaryBtn: { width: "100%", background: "#00d2ef", color: "#0d1117", border: "none", borderRadius: 10, padding: "13px", fontWeight: 700, fontSize: 15, cursor: "pointer" },
+  emptyState: { textAlign: "center", padding: "50px 20px", color: "#94a3b8" },
+  card: { background: "#fff", borderRadius: 12, padding: 16, margin: "0 16px 10px", border: "1px solid #e2e8f0", boxShadow: "0 1px 3px rgba(0,0,0,0.06)" },
+  label: { fontSize: 12, color: "#475569", marginBottom: 5, display: "block", fontWeight: 500 },
+  input: { width: "100%", background: "#fff", border: "1px solid #cbd5e1", borderRadius: 8, color: "#1e293b", fontSize: 14, padding: "10px 12px", marginBottom: 12, boxSizing: "border-box", fontFamily: "inherit" },
+  primaryBtn: { width: "100%", background: "#22c55e", color: "#fff", border: "none", borderRadius: 10, padding: "13px", fontWeight: 700, fontSize: 15, cursor: "pointer" },
   address: { color: "#64748b", fontSize: 12, padding: "2px 16px 8px", margin: 0 },
   statRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 },
   stat: { textAlign: "center" },
-  statVal: { fontSize: 19, fontWeight: 700, color: "#fff" },
+  statVal: { fontSize: 19, fontWeight: 700, color: "#1e293b" },
   statLbl: { fontSize: 10, color: "#64748b", marginTop: 3 },
-  rateBar: { height: 6, background: "#1e2a38", borderRadius: 3, overflow: "hidden" },
+  rateBar: { height: 6, background: "#e2e8f0", borderRadius: 3, overflow: "hidden" },
   rateBarFill: { height: "100%", borderRadius: 3, transition: "width 0.5s" },
-  rateHint: { fontSize: 12, color: "#94a3b8", marginTop: 6 },
+  rateHint: { fontSize: 12, color: "#64748b", marginTop: 6 },
   rowBetween: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  checkBtn: { borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer", color: "#fff", fontWeight: 600 },
-  timerDisplay: { fontSize: 38, fontWeight: 700, color: "#00d2ef", fontVariantNumeric: "tabular-nums", marginBottom: 6 },
+  checkBtn: { borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer", color: "#fff", fontWeight: 600, background: "#22c55e", border: "none" },
+  timerDisplay: { fontSize: 38, fontWeight: 700, color: "#22c55e", fontVariantNumeric: "tabular-nums", marginBottom: 6 },
   locText: { fontSize: 11, color: "#64748b", marginBottom: 12 },
-  startBtn: { width: "100%", background: "#14532d", border: "1px solid #4ade80", color: "#4ade80", borderRadius: 10, padding: 13, fontWeight: 700, fontSize: 15, cursor: "pointer" },
-  stopBtn: { background: "#7f1d1d", border: "1px solid #f87171", color: "#f87171", borderRadius: 10, padding: "12px 28px", fontWeight: 700, fontSize: 15, cursor: "pointer" },
-  sectionTitle: { fontWeight: 600, fontSize: 13, color: "#94a3b8", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" },
-  empty: { color: "#4b5563", fontSize: 13, textAlign: "center", padding: "12px 0" },
-  sessionRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1e2a38" },
-  totalRow: { display: "flex", justifyContent: "space-between", paddingTop: 10, color: "#94a3b8", fontSize: 13, fontWeight: 600 },
-  deleteBtn: { display: "block", margin: "16px auto 0", background: "none", border: "1px solid #371111", color: "#f87171", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" },
-  dayStat: { background: "#0d1117", borderRadius: 8, padding: "8px 4px", textAlign: "center" },
-  dayStatVal: { fontSize: 16, fontWeight: 700, color: "#fff" },
+  startBtn: { width: "100%", background: "#dcfce7", border: "1px solid #22c55e", color: "#16a34a", borderRadius: 10, padding: 13, fontWeight: 700, fontSize: 15, cursor: "pointer" },
+  stopBtn: { background: "#fee2e2", border: "1px solid #ef4444", color: "#dc2626", borderRadius: 10, padding: "12px 28px", fontWeight: 700, fontSize: 15, cursor: "pointer" },
+  sectionTitle: { fontWeight: 600, fontSize: 13, color: "#1e293b", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" },
+  empty: { color: "#94a3b8", fontSize: 13, textAlign: "center", padding: "12px 0" },
+  sessionRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #e2e8f0" },
+  totalRow: { display: "flex", justifyContent: "space-between", paddingTop: 10, color: "#64748b", fontSize: 13, fontWeight: 600 },
+  deleteBtn: { display: "block", margin: "16px auto 0", background: "none", border: "1px solid #fca5a5", color: "#dc2626", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" },
+  dayStat: { background: "#f1f5f9", borderRadius: 8, padding: "8px 4px", textAlign: "center", border: "1px solid #e2e8f0" },
+  dayStatVal: { fontSize: 16, fontWeight: 700, color: "#1e293b" },
   dayStatLbl: { fontSize: 9, color: "#64748b", marginTop: 2 },
-  routeStop: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #1e2a38" },
-  routeDot: { width: 10, height: 10, borderRadius: "50%", background: "#00d2ef", flexShrink: 0 },
-  routeJobRow: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #1e2a38" },
-  routeNumBadge: { width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0 },
-  mapsBtn: { display: "block", background: "#1a2535", border: "1px solid #1e3a5f", color: "#60a5fa", borderRadius: 10, padding: "13px", fontWeight: 600, fontSize: 14, textAlign: "center", textDecoration: "none", marginBottom: 12 },
+  routeStop: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #e2e8f0" },
+  routeDot: { width: 10, height: 10, borderRadius: "50%", background: "#22c55e", flexShrink: 0 },
+  routeJobRow: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #e2e8f0" },
+  routeNumBadge: { width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0, background: "#22c55e" },
+  mapsBtn: { display: "block", background: "#f0f9ff", border: "1px solid #bfdbfe", color: "#0369a1", borderRadius: 10, padding: "13px", fontWeight: 600, fontSize: 14, textAlign: "center", textDecoration: "none", marginBottom: 12 },
   navBtn: { background: "none", border: "none", color: "#64748b", fontSize: 13, cursor: "pointer", padding: "4px 8px" },
 };
