@@ -303,8 +303,7 @@ export default function LawncareTracker() {
       return [j.name, j.clientName || "", sessions.length, revenue.toFixed(2), hours.toFixed(1), rate.toFixed(0)];
     });
 
-    const escapeCSV = (v) => `"${String(v).replace(/"/g, '""')}"`;
-    const csv = [headers, ...data].map(row => row.map(escapeCSV).join(",")).join("\n");
+    const csv = [headers, ...data].map(row => row.join(",")).join("\n");
     const blob = new Blob([csv], { type: "text/csv" });
     const url = URL.createObjectURL(blob);
     const link = document.createElement("a");
