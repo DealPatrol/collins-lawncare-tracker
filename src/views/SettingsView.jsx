@@ -1,8 +1,13 @@
-import { useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import { exportBackup, parseBackup } from "../store.js";
 import { getCurrentCoords } from "../location.js";
-import { getTodayKey } from "../utils.js";
-import { IconPin, IconDownload, IconUpload, IconTarget, IconSearch } from "../icons.jsx";
+import { formatMoney, getTodayKey } from "../utils.js";
+import {
+  buildMileageCsv, buildMileageRows, EXPENSE_CATEGORIES, expenseTotal, mileageTotal,
+} from "../reports.js";
+import {
+  IconPin, IconDownload, IconUpload, IconTarget, IconSearch, IconSend, IconDollar, IconRoute, IconTrash, IconPlus,
+} from "../icons.jsx";
 
 function Toggle({ checked, onChange }) {
   return (
@@ -31,12 +36,25 @@ function Toggle({ checked, onChange }) {
   );
 }
 
-export default function SettingsView({ state, me, onUpdateSettings, onRestore, onSwitchEmployee, showToast }) {
+export default function SettingsView({
+  state, me, onUpdateSettings, onRestore, onSwitchEmployee, onAddExpense, onDeleteExpense, showToast,
+}) {
   const { settings } = state;
   const importRef = useRef(null);
   const [homeAddress, setHomeAddress] = useState(settings.homeAddress);
   const [regridToken, setRegridToken] = useState(settings.regridToken || "");
   const [bizPhone, setBizPhone] = useState(settings.bizPhone || "");
+  const [webhookUrl, setWebhookUrl] = useState(settings.notifyWebhookUrl || "");
+  const [msgTemplate, setMsgTemplate] = useState(settings.notifyMessageTemplate || "");
+  const [mileageRate, setMileageRate] = useState(String(settings.mileageRate ?? 0.7));
+  const [expForm, setExpForm] = useState({ category: "Fuel", amount: "", note: "", date: getTodayKey() });
+
+  const mileageRows = useMemo(() => buildMileageRows(state), [state]);
+  const totalMiles = mileageTotal(mileageRows);
+  const recentExpenses = useMemo(
+    () => [...(state.expenses || [])].sort((a, b) => b.date.localeCompare(a.date) || b.createdAt - a.createdAt),
+    [state.expenses]
+  );
 
   const setHomeGps = async () => {
     try {
@@ -69,6 +87,31 @@ export default function SettingsView({ state, me, onUpdateSettings, onRestore, o
       }
     };
     reader.readAsText(file);
+  };
+
+  const doExportMileage = () => {
+    const rate = parseFloat(mileageRate) || 0;
+    if (!mileageRows.length) {
+      showToast("No recorded mileage yet — clock in and drive to a job first.", "amber");
+      return;
+    }
+    const csv = buildMileageCsv(mileageRows, rate);
+    const blob = new Blob([csv], { type: "text/csv" });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = `collins-lawncare-mileage-${getTodayKey()}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+    showToast("Mileage log downloaded.");
+  };
+
+  const saveExpense = () => {
+    const amount = parseFloat(expForm.amount);
+    if (!expForm.date || isNaN(amount) || amount <= 0) return;
+    onAddExpense({ date: expForm.date, category: expForm.category, amount, note: expForm.note.trim() });
+    setExpForm((f) => ({ ...f, amount: "", note: "" }));
+    showToast("Expense logged.");
   };
 
   return (
@@ -189,6 +232,117 @@ export default function SettingsView({ state, me, onUpdateSettings, onRestore, o
             those up, because cold-texting looked-up numbers violates the TCPA ($500–$1,500 per text). Cold
             outreach goes out as a letter or door hanger; texting unlocks when a lead gives you their number.
           </p>
+        </div>
+
+        {/* Customer Notifications */}
+        <div className="card">
+          <div className="section-title"><IconSend size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Customer Notifications</div>
+          <p className="text-dim" style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
+            Automatically text a customer the moment their job&apos;s marked done — no tap needed. The app has
+            no backend of its own, so this needs a free <b>Zapier</b> &quot;Catch Hook&quot; wired to an SMS
+            action (Twilio, SMS by Zapier, etc.) — paste that hook&apos;s URL below. Then turn it on per job
+            in that job&apos;s edit screen.
+          </p>
+          <label className="field-label">Webhook URL</label>
+          <input
+            className="input" placeholder="https://hooks.zapier.com/hooks/catch/…"
+            value={webhookUrl} onChange={(e) => setWebhookUrl(e.target.value)}
+            autoCapitalize="none" autoCorrect="off" spellCheck={false}
+          />
+          <label className="field-label">Message template</label>
+          <textarea
+            className="input" rows={3} style={{ resize: "vertical", fontSize: 12.5 }}
+            value={msgTemplate} onChange={(e) => setMsgTemplate(e.target.value)}
+          />
+          <p className="text-faint" style={{ fontSize: 11, marginBottom: 10 }}>
+            Placeholders: {"{customer}"} {"{job}"} {"{crew}"}
+          </p>
+          <button
+            className="btn btn-ghost btn-block"
+            onClick={() => { onUpdateSettings({ notifyWebhookUrl: webhookUrl.trim(), notifyMessageTemplate: msgTemplate }); showToast("Notification settings saved."); }}
+          >
+            Save Notification Settings
+          </button>
+        </div>
+
+        {/* Expenses */}
+        <div className="card">
+          <div className="section-title"><IconDollar size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Expenses</div>
+          <p className="text-dim" style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
+            Log fuel, equipment, and other costs so Today can show real profit, not just revenue.
+          </p>
+          <div className="stat-grid-2">
+            <div>
+              <label className="field-label">Date</label>
+              <input className="input" type="date" value={expForm.date} onChange={(e) => setExpForm((f) => ({ ...f, date: e.target.value }))} />
+            </div>
+            <div>
+              <label className="field-label">Amount ($)</label>
+              <input className="input" type="number" inputMode="decimal" placeholder="45.00" value={expForm.amount} onChange={(e) => setExpForm((f) => ({ ...f, amount: e.target.value }))} />
+            </div>
+          </div>
+          <label className="field-label">Category</label>
+          <div className="seg-control" style={{ flexWrap: "wrap" }}>
+            {EXPENSE_CATEGORIES.map((c) => (
+              <button key={c} className={`seg-option${expForm.category === c ? " active" : ""}`} onClick={() => setExpForm((f) => ({ ...f, category: c }))}>
+                {c}
+              </button>
+            ))}
+          </div>
+          <label className="field-label">Note (optional)</label>
+          <input className="input" placeholder="e.g. Gas at Shell" value={expForm.note} onChange={(e) => setExpForm((f) => ({ ...f, note: e.target.value }))} />
+          <button className="btn btn-primary btn-block" disabled={!expForm.amount} onClick={saveExpense}>
+            <IconPlus size={15} />Log Expense
+          </button>
+          {recentExpenses.length > 0 && (
+            <>
+              <div className="divider" />
+              <div className="row-between" style={{ marginBottom: 8 }}>
+                <span className="text-dim" style={{ fontSize: 12.5, fontWeight: 700 }}>Recent</span>
+                <span className="text-dim" style={{ fontSize: 12.5, fontWeight: 700 }}>{formatMoney(expenseTotal(recentExpenses))} total</span>
+              </div>
+              {recentExpenses.slice(0, 8).map((e) => (
+                <div key={e.id} className="list-row">
+                  <div style={{ flex: 1, minWidth: 0 }}>
+                    <div style={{ fontWeight: 600, fontSize: 13.5 }}>{e.category}{e.note ? ` · ${e.note}` : ""}</div>
+                    <div className="text-faint" style={{ fontSize: 11.5 }}>{e.date}</div>
+                  </div>
+                  <span style={{ fontWeight: 700, fontSize: 13.5, marginRight: 8 }}>{formatMoney(e.amount)}</span>
+                  <button className="link-btn text-faint" style={{ padding: 2 }} onClick={() => onDeleteExpense(e.id)} aria-label="Delete expense">
+                    <IconTrash size={14} />
+                  </button>
+                </div>
+              ))}
+            </>
+          )}
+        </div>
+
+        {/* Mileage & Taxes */}
+        <div className="card">
+          <div className="section-title"><IconRoute size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Mileage &amp; Taxes</div>
+          <p className="text-dim" style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
+            Every mile the app already tracks while you&apos;re clocked in, turned into an IRS-ready mileage log —
+            no extra data entry.
+          </p>
+          <div className="stat-grid" style={{ marginBottom: 12 }}>
+            <div className="stat-tile stat-tile-flat">
+              <div className="stat-value text-blue">{totalMiles.toFixed(0)}</div>
+              <div className="stat-label">MILES LOGGED</div>
+            </div>
+            <div className="stat-tile stat-tile-flat">
+              <div className="stat-value text-good">{formatMoney(totalMiles * (parseFloat(mileageRate) || 0))}</div>
+              <div className="stat-label">DEDUCTION</div>
+            </div>
+          </div>
+          <label className="field-label">IRS mileage rate ($/mile — changes yearly)</label>
+          <input
+            className="input" type="number" inputMode="decimal" step="0.01" value={mileageRate}
+            onChange={(e) => setMileageRate(e.target.value)}
+            onBlur={() => onUpdateSettings({ mileageRate: parseFloat(mileageRate) || 0 })}
+          />
+          <button className="btn btn-primary btn-block" onClick={doExportMileage}>
+            <IconDownload size={15} />Export Mileage Log (CSV)
+          </button>
         </div>
 
         {/* Backup */}

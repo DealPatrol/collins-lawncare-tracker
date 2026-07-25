@@ -3,6 +3,7 @@ import {
   formatClock, formatDuration, formatMiles, formatMoney, formatTime,
   isMowedThisWeek, lastNDayKeys, haversineMeters, getAvgTime,
 } from "../utils.js";
+import { expensesInRange, profitSummary } from "../reports.js";
 import { fetchWeather } from "../weather.js";
 import {
   IconLeaf, IconPlay, IconStop, IconTruck, IconTarget, IconZap,
@@ -58,6 +59,10 @@ export default function TodayView({
   }, [jobs]);
 
   const weekRevenue = jobs.reduce((a, j) => (isMowedThisWeek(j) ? a + j.pay : a), 0);
+
+  // Profit for the same rolling 7 days shown in the sparkline below.
+  const weekExpenses = useMemo(() => expensesInRange(state, week.keys), [state, week.keys]);
+  const profit = profitSummary(week.total, weekExpenses);
 
   return (
     <>
@@ -232,6 +237,17 @@ export default function TodayView({
               );
             })}
           </div>
+          {weekExpenses.length > 0 && (
+            <>
+              <div className="divider" />
+              <div className="row-between">
+                <span className="text-dim" style={{ fontSize: 12.5 }}>Revenue {formatMoney(profit.revenue)} − expenses {formatMoney(profit.cost)}</span>
+                <span className={profit.profit >= 0 ? "text-good" : "text-bad"} style={{ fontWeight: 800, fontSize: 14 }}>
+                  {formatMoney(profit.profit)} profit
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Today's stops */}

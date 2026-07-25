@@ -20,6 +20,9 @@ export const DEFAULT_SETTINGS = {
   weather: true,
   bizPhone: "", // callback number merged into outreach messages
   regridToken: "", // parcel-records API key that powers the Prospector
+  mileageRate: 0.7, // $/mile for the mileage export — IRS rate changes yearly
+  notifyWebhookUrl: "", // fires when a job's timer stops, if the job opts in
+  notifyMessageTemplate: "Hey {customer}, {crew} from Collins Lawncare just finished up at {job}. Thanks for choosing us!",
 };
 
 function readJSON(key, fallback) {
@@ -58,6 +61,7 @@ function migrateLegacy() {
     jobs: jobs.map((j) => ({ radius: null, ...j })),
     workdays,
     prospects: [],
+    expenses: [],
     settings: { ...DEFAULT_SETTINGS, homeAddress, homeCoords },
   };
 }
@@ -72,6 +76,7 @@ export function loadState() {
       jobs: existing.jobs || [],
       workdays: existing.workdays || {},
       prospects: existing.prospects || [],
+      expenses: existing.expenses || [],
     };
   }
   return migrateLegacy();
@@ -175,6 +180,7 @@ export function parseBackup(raw) {
       jobs: data.jobs,
       workdays: data.workdays || {},
       prospects: data.prospects || [],
+      expenses: data.expenses || [],
       settings: { ...DEFAULT_SETTINGS, ...data.settings },
     };
   }
@@ -193,6 +199,7 @@ export function parseBackup(raw) {
       jobs: data.jobs.map((j) => ({ radius: null, ...j })),
       workdays,
       prospects: [],
+      expenses: [],
       settings: {
         ...DEFAULT_SETTINGS,
         homeAddress: data.homeAddress || "",

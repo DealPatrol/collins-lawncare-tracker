@@ -15,6 +15,9 @@ export default function JobForm({ job, prefill, settings, onSave, onBack }) {
     lat: src?.coords?.lat ?? "",
     lng: src?.coords?.lng ?? "",
     radius: src?.radius ?? "",
+    customerName: src?.customerName || "",
+    customerPhone: src?.customerPhone || "",
+    notifyOnComplete: src?.notifyOnComplete || false,
   });
   const [geoStatus, setGeoStatus] = useState("");
 
@@ -49,6 +52,9 @@ export default function JobForm({ job, prefill, settings, onSave, onBack }) {
       notes: form.notes,
       coords,
       radius: !isNaN(radius) && radius > 0 ? radius : null,
+      customerName: form.customerName.trim(),
+      customerPhone: form.customerPhone.trim(),
+      notifyOnComplete: form.notifyOnComplete,
     });
   };
 
@@ -96,6 +102,40 @@ export default function JobForm({ job, prefill, settings, onSave, onBack }) {
 
           <label className="field-label">Notes</label>
           <textarea className="input" style={{ height: 76, resize: "vertical" }} placeholder="Gate code, dog, trimming, where to park…" value={form.notes} onChange={set("notes")} />
+        </div>
+
+        <div className="card">
+          <div className="section-title">Customer Contact</div>
+          <label className="field-label">Customer name (for texts, optional)</label>
+          <input className="input" placeholder="e.g. Sarah Smith" value={form.customerName} onChange={set("customerName")} />
+          <label className="field-label">Customer phone (optional)</label>
+          <input className="input" type="tel" placeholder="(256) 555-0123" value={form.customerPhone} onChange={set("customerPhone")} />
+          <label className="field-label">Text them when the job&apos;s done</label>
+          <div className="seg-control">
+            <button
+              className={`seg-option${!form.notifyOnComplete ? " active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, notifyOnComplete: false }))}
+            >
+              Off
+            </button>
+            <button
+              className={`seg-option${form.notifyOnComplete ? " active" : ""}`}
+              disabled={!settings.notifyWebhookUrl || !form.customerPhone.trim()}
+              onClick={() => setForm((f) => ({ ...f, notifyOnComplete: true }))}
+            >
+              Notify
+            </button>
+          </div>
+          {!settings.notifyWebhookUrl && (
+            <p className="text-faint" style={{ fontSize: 11.5, marginTop: 8, lineHeight: 1.5 }}>
+              Set up a notification webhook in Settings → Customer Notifications to turn this on.
+            </p>
+          )}
+          {settings.notifyWebhookUrl && !form.customerPhone.trim() && (
+            <p className="text-faint" style={{ fontSize: 11.5, marginTop: 8, lineHeight: 1.5 }}>
+              Add a customer phone number above to enable notifications for this job.
+            </p>
+          )}
         </div>
 
         <div className="card">

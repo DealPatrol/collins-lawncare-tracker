@@ -6,6 +6,7 @@ import {
 import { getCurrentCoords } from "../location.js";
 import { formatValueShort } from "../prospecting.js";
 import { ZoneFinder, OutreachSheet } from "./ProspectorTools.jsx";
+import SeasonalOpportunity from "./SeasonalOutreach.jsx";
 import { IconAlert, IconExternal, IconPin, IconPlus, IconSearch, IconSend, IconTarget, IconTrash, IconZap } from "../icons.jsx";
 
 const STATUS_META = {
@@ -117,7 +118,7 @@ function AddProspectForm({ defaultCoords, onAdd, onClose }) {
   );
 }
 
-export default function GrowthView({ state, openJob, onAddProspect, onUpdateProspect, onDeleteProspect, onConvertProspect, showToast }) {
+export default function GrowthView({ state, openJob, onAddProspect, onUpdateProspect, onDeleteProspect, onConvertProspect, onUpdateJob, showToast }) {
   const { jobs, settings, prospects = [] } = state;
   const origin = settings.homeCoords || null;
   const [addingIn, setAddingIn] = useState(null); // zone key (anchor id) | "unzoned" | null
@@ -148,19 +149,29 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
 
   if (!zones.length) {
     return (
-      <div className="empty-state">
-        <div className="empty-icon"><IconTarget size={44} /></div>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>No zones to analyze yet</div>
-        <div style={{ fontSize: 13.5 }}>
-          Pin your yards on the map (edit a job → Pin Current Location) and this screen will group them into
-          zones, score each zone&apos;s real $/hr with drive time included, and show where one more yard makes the trip pay.
+      <>
+        <div className="empty-state">
+          <div className="empty-icon"><IconTarget size={44} /></div>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>No zones to analyze yet</div>
+          <div style={{ fontSize: 13.5 }}>
+            Pin your yards on the map (edit a job → Pin Current Location) and this screen will group them into
+            zones, score each zone&apos;s real $/hr with drive time included, and show where one more yard makes the trip pay.
+          </div>
         </div>
-      </div>
+        <SeasonalOpportunity
+          jobs={jobs} senderName={senderName} bizPhone={settings.bizPhone}
+          onUpdateJob={onUpdateJob} showToast={showToast}
+        />
+      </>
     );
   }
 
   return (
     <>
+      <SeasonalOpportunity
+        jobs={jobs} senderName={senderName} bizPhone={settings.bizPhone}
+        onUpdateJob={onUpdateJob} showToast={showToast}
+      />
       <div className="stat-grid" style={{ marginBottom: 12 }}>
         <div className="stat-tile">
           <div className="stat-value">{zones.length}</div>
