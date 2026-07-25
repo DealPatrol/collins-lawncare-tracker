@@ -3,6 +3,8 @@ import {
   loadState, saveState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect,
   encodeCrewInvite, decodeCrewInvite, applyCrewInvite,
 } from "./store.js";
+import { makeExpense } from "./reports.js";
+import { buildCompletionMessage, sendCompletionWebhook } from "./notify.js";
 import { getTodayKey, getWeekKey } from "./utils.js";
 import { getCurrentCoords } from "./location.js";
 import { useGpsTracking } from "./useGpsTracking.js";
@@ -100,6 +102,12 @@ export default function App() {
     setSubview(null);
   };
 
+  // Lightweight patch for fields outside the full JobForm save flow (e.g.
+  // seasonal outreach recording contact info / lastUpsellContactedAt).
+  const updateJob = (jobId, patch) => {
+    setState((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === jobId ? { ...j, ...patch } : j)) }));
+  };
+
   // ── Prospects (Growth Zones leads) ──
   const addProspect = (data) => {
     setState((s) => ({ ...s, prospects: [...(s.prospects || []), makeProspect(data)] }));
@@ -114,6 +122,15 @@ export default function App() {
 
   const deleteProspect = (id) => {
     setState((s) => ({ ...s, prospects: (s.prospects || []).filter((p) => p.id !== id) }));
+  };
+
+  // ── Expenses ──
+  const addExpense = (data) => {
+    setState((s) => ({ ...s, expenses: [...(s.expenses || []), makeExpense(data)] }));
+  };
+
+  const deleteExpense = (id) => {
+    setState((s) => ({ ...s, expenses: (s.expenses || []).filter((e) => e.id !== id) }));
   };
 
   // A won lead becomes a job: open the form prefilled as a monthly contract.
@@ -169,8 +186,9 @@ export default function App() {
     });
   };
 
-  const stopTimer = useCallback((jobId, { auto = false } = {}) => {
+  const stopTimer = (jobId, { auto = false } = {}) => {
     const now = Date.now();
+    const jobBefore = state.jobs.find((j) => j.id === jobId);
     setState((s) => {
       const job = s.jobs.find((j) => j.id === jobId);
       if (!job?.currentSessionStart) return s;
@@ -213,7 +231,22 @@ export default function App() {
       if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
       showToast("Left the job site — timer stopped and visit saved automatically.");
     }
-  }, [meId, showToast]);
+    if (jobBefore?.notifyOnComplete && jobBefore?.customerPhone && state.settings.notifyWebhookUrl) {
+      const empId = jobBefore.currentSessionEmployeeId || meId;
+      const crewName = state.employees.find((e) => e.id === empId)?.name || me?.name;
+      sendCompletionWebhook(state.settings.notifyWebhookUrl, {
+        to: jobBefore.customerPhone,
+        message: buildCompletionMessage(state.settings.notifyMessageTemplate, {
+          customer: jobBefore.customerName || null,
+          job: jobBefore.name,
+          crew: crewName,
+        }),
+        job: jobBefore.name,
+        address: jobBefore.address || "",
+        completedAt: now,
+      });
+    }
+  };
 
   // ── GPS tracking ──
   const pendingDistance = useRef(0);
@@ -229,7 +262,7 @@ export default function App() {
     });
   }, [meId]);
 
-  const onAutoStop = useCallback((job) => stopTimer(job.id, { auto: true }), [stopTimer]);
+  const onAutoStop = (job) => stopTimer(job.id, { auto: true });
   const onArrive = (job) => {
     if (navigator.vibrate) navigator.vibrate(80);
     startTimer(job.id);
@@ -306,10 +339,13 @@ export default function App() {
     state, me, myDay, workdayRunning, activeJob, lastFix, gpsError, todayKey, now,
     startWorkday, endWorkday, startTimer, stopTimer, toggleMow, openJob,
     onAddJob: () => setSubview({ kind: "form" }),
+    onUpdateJob: updateJob,
     onAddProspect: addProspect,
     onUpdateProspect: updateProspect,
     onDeleteProspect: deleteProspect,
     onConvertProspect: convertProspect,
+    onAddExpense: addExpense,
+    onDeleteExpense: deleteExpense,
     showToast,
   };
 
