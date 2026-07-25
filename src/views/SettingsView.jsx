@@ -6,7 +6,7 @@ import {
   buildMileageCsv, buildMileageRows, EXPENSE_CATEGORIES, expenseTotal, mileageTotal,
 } from "../reports.js";
 import {
-  IconPin, IconDownload, IconUpload, IconTarget, IconSearch, IconSend, IconDollar, IconRoute, IconTrash, IconPlus,
+  IconPin, IconDownload, IconUpload, IconTarget, IconSearch, IconSend, IconDollar, IconRoute, IconTrash, IconPlus, IconZap,
 } from "../icons.jsx";
 
 function Toggle({ checked, onChange }) {
@@ -47,6 +47,7 @@ export default function SettingsView({
   const [webhookUrl, setWebhookUrl] = useState(settings.notifyWebhookUrl || "");
   const [msgTemplate, setMsgTemplate] = useState(settings.notifyMessageTemplate || "");
   const [mileageRate, setMileageRate] = useState(String(settings.mileageRate ?? 0.7));
+  const [anthropicApiKey, setAnthropicApiKey] = useState(settings.anthropicApiKey || "");
   const [expForm, setExpForm] = useState({ category: "Fuel", amount: "", note: "", date: getTodayKey() });
 
   const mileageRows = useMemo(() => buildMileageRows(state), [state]);
@@ -231,6 +232,33 @@ export default function SettingsView({
             Owner names come from public tax records. Homeowner phone numbers don&apos;t — the app never looks
             those up, because cold-texting looked-up numbers violates the TCPA ($500–$1,500 per text). Cold
             outreach goes out as a letter or door hanger; texting unlocks when a lead gives you their number.
+          </p>
+        </div>
+
+        {/* AI Yard Quoting */}
+        <div className="card">
+          <div className="section-title"><IconZap size={13} style={{ verticalAlign: -2, marginRight: 5 }} />AI Yard Quoting</div>
+          <p className="text-dim" style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
+            On any saved lead in Growth Zones, get an instant rough size &amp; price estimate from a satellite
+            photo — no site visit needed. It reads a public satellite image and estimates size/complexity;
+            the price range is calculated from <b>your own</b> average price, not invented by the AI. Needs
+            your own Anthropic API key (console.anthropic.com — billed per estimate, a few cents each).
+          </p>
+          <label className="field-label">Anthropic API key</label>
+          <input
+            className="input" type="password" placeholder="sk-ant-…"
+            value={anthropicApiKey} onChange={(e) => setAnthropicApiKey(e.target.value)}
+            autoCapitalize="none" autoCorrect="off" spellCheck={false}
+          />
+          <button
+            className="btn btn-ghost btn-block"
+            onClick={() => { onUpdateSettings({ anthropicApiKey: anthropicApiKey.trim() }); showToast("AI quoting settings saved."); }}
+          >
+            Save AI Quoting Settings
+          </button>
+          <p className="text-faint" style={{ fontSize: 11.5, marginTop: 10, lineHeight: 1.5 }}>
+            Every estimate is labeled &quot;estimated — confirm on-site&quot;. Treat it as a starting point for
+            the conversation, not a firm quote — a wrong instant number can under- or over-price a real job.
           </p>
         </div>
 

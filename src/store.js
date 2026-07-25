@@ -23,6 +23,7 @@ export const DEFAULT_SETTINGS = {
   mileageRate: 0.7, // $/mile for the mileage export — IRS rate changes yearly
   notifyWebhookUrl: "", // fires when a job's timer stops, if the job opts in
   notifyMessageTemplate: "Hey {customer}, {crew} from Collins Lawncare just finished up at {job}. Thanks for choosing us!",
+  anthropicApiKey: "", // powers AI satellite yard quoting on Prospector leads
 };
 
 function readJSON(key, fallback) {
@@ -124,10 +125,14 @@ export function pruneWorkdays(workdays) {
 
 // ── Prospects (leads) ─────────────────────────────────────────
 // prospect: { id, name, address, coords, targetMonthly, status, createdAt,
-//   owner, phone, email, value, mailAddress, source, lastContactedAt }
+//   owner, phone, email, value, mailAddress, source, lastContactedAt,
+//   aiEstimate }
 // status: "new" | "quoted" | "won" | "lost"
 // owner/value/mailAddress come from public county parcel records when the
 // lead was found by the Prospector; phone/email are only ever user-entered.
+// aiEstimate (optional): { sizeBucket, estimatedSqFt, complexity, obstacles,
+//   confidence, notes, imageUrl, priceLow, priceHigh, estimatedAt } from the
+//   satellite quoting tool — see quoting.js.
 
 export function makeProspect(data) {
   return {
@@ -145,6 +150,7 @@ export function makeProspect(data) {
     mailAddress: "",
     source: "manual", // "manual" | "parcel"
     lastContactedAt: null,
+    aiEstimate: null,
     ...data,
   };
 }

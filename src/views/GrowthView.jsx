@@ -5,6 +5,7 @@ import {
 } from "../utils.js";
 import { getCurrentCoords } from "../location.js";
 import { formatValueShort } from "../prospecting.js";
+import { estimateYard } from "../quoting.js";
 import { ZoneFinder, OutreachSheet } from "./ProspectorTools.jsx";
 import SeasonalOpportunity from "./SeasonalOutreach.jsx";
 import { IconAlert, IconExternal, IconPin, IconPlus, IconSearch, IconSend, IconTarget, IconTrash, IconZap } from "../icons.jsx";
@@ -27,47 +28,91 @@ function zoneBadge(zone) {
   return { label: `Needs +${zone.yardsToTarget} yard${zone.yardsToTarget === 1 ? "" : "s"}`, cls: "badge-amber" };
 }
 
-function ProspectRow({ prospect, onUpdate, onDelete, onConvert, onMessage }) {
+function ProspectRow({ prospect, onUpdate, onDelete, onConvert, onMessage, apiKey, basePrice, showToast }) {
   const meta = STATUS_META[prospect.status] || STATUS_META.new;
+  const [estimating, setEstimating] = useState(false);
+  const est = prospect.aiEstimate;
+
+  const runEstimate = async () => {
+    if (!apiKey) {
+      showToast("Add your Anthropic API key in Settings → AI Yard Quoting first.", "amber");
+      return;
+    }
+    setEstimating(true);
+    try {
+      const result = await estimateYard({ apiKey, coords: prospect.coords, basePrice });
+      onUpdate(prospect.id, { aiEstimate: result });
+    } catch (e) {
+      showToast(e.message || "Estimate failed.", "red");
+    } finally {
+      setEstimating(false);
+    }
+  };
+
   return (
-    <div className="list-row" style={{ alignItems: "flex-start" }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{prospect.name}</div>
-        <div className="text-faint" style={{ fontSize: 12 }}>
-          {[
-            prospect.owner || null,
-            prospect.address !== prospect.name ? prospect.address : null,
-            prospect.value ? formatValueShort(prospect.value) : null,
-            prospect.targetMonthly ? `target ${formatMoney(prospect.targetMonthly)}/mo` : null,
-          ].filter(Boolean).join(" · ") || "Lead"}
-        </div>
-        <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-          {STATUS_ORDER.map((s) => (
-            <button
-              key={s}
-              className={`badge ${prospect.status === s ? STATUS_META[s].cls : "badge-dim"}`}
-              style={{ border: "none", cursor: "pointer", opacity: prospect.status === s ? 1 : 0.55 }}
-              onClick={() => onUpdate(prospect.id, { status: s })}
-            >
-              {STATUS_META[s].label}
+    <div className="list-row" style={{ alignItems: "flex-start", flexDirection: "column" }}>
+      <div className="row-between" style={{ width: "100%" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{prospect.name}</div>
+          <div className="text-faint" style={{ fontSize: 12 }}>
+            {[
+              prospect.owner || null,
+              prospect.address !== prospect.name ? prospect.address : null,
+              prospect.value ? formatValueShort(prospect.value) : null,
+              prospect.targetMonthly ? `target ${formatMoney(prospect.targetMonthly)}/mo` : null,
+            ].filter(Boolean).join(" · ") || "Lead"}
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+            {STATUS_ORDER.map((s) => (
+              <button
+                key={s}
+                className={`badge ${prospect.status === s ? STATUS_META[s].cls : "badge-dim"}`}
+                style={{ border: "none", cursor: "pointer", opacity: prospect.status === s ? 1 : 0.55 }}
+                onClick={() => onUpdate(prospect.id, { status: s })}
+              >
+                {STATUS_META[s].label}
+              </button>
+            ))}
+            <button className="badge badge-blue" style={{ border: "none", cursor: "pointer" }} onClick={() => onMessage(prospect)}>
+              <IconSend size={11} />{prospect.lastContactedAt ? "Message again" : "Message"}
             </button>
-          ))}
-          <button className="badge badge-blue" style={{ border: "none", cursor: "pointer" }} onClick={() => onMessage(prospect)}>
-            <IconSend size={11} />{prospect.lastContactedAt ? "Message again" : "Message"}
+            {prospect.coords && (
+              <button className="badge badge-blue" style={{ border: "none", cursor: "pointer" }} disabled={estimating} onClick={runEstimate}>
+                <IconZap size={11} />{estimating ? "Estimating…" : est ? "Re-estimate" : "AI Quote"}
+              </button>
+            )}
+            {prospect.status === "won" && (
+              <button className="badge badge-green" style={{ border: "none", cursor: "pointer" }} onClick={() => onConvert(prospect)}>
+                <IconPlus size={11} />Add as job
+              </button>
+            )}
+          </div>
+        </div>
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+          <span className={`badge ${meta.cls}`}>{meta.label}</span>
+          <button className="link-btn text-faint" style={{ padding: 2 }} onClick={() => onDelete(prospect.id)} aria-label="Delete lead">
+            <IconTrash size={14} />
           </button>
-          {prospect.status === "won" && (
-            <button className="badge badge-green" style={{ border: "none", cursor: "pointer" }} onClick={() => onConvert(prospect)}>
-              <IconPlus size={11} />Add as job
-            </button>
-          )}
         </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-        <span className={`badge ${meta.cls}`}>{meta.label}</span>
-        <button className="link-btn text-faint" style={{ padding: 2 }} onClick={() => onDelete(prospect.id)} aria-label="Delete lead">
-          <IconTrash size={14} />
-        </button>
-      </div>
+      {est && (
+        <div style={{ width: "100%", marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+          <div className="row-between">
+            <span className="text-good" style={{ fontWeight: 800, fontSize: 15 }}>
+              {formatMoney(est.priceLow)}–{formatMoney(est.priceHigh)}
+            </span>
+            <span className="badge badge-dim" style={{ fontSize: 10.5 }}>{est.confidence} confidence</span>
+          </div>
+          <div className="text-faint" style={{ fontSize: 11.5, marginTop: 4 }}>
+            ~{est.estimatedSqFt?.toLocaleString()} sq ft · {est.sizeBucket} · {est.complexity}
+            {est.obstacles?.length ? ` · ${est.obstacles.join(", ")}` : ""}
+          </div>
+          {est.notes && <div className="text-faint" style={{ fontSize: 11.5, marginTop: 2, fontStyle: "italic" }}>{est.notes}</div>}
+          <div className="text-faint" style={{ fontSize: 10.5, marginTop: 6 }}>
+            Estimated from a satellite photo — confirm on-site before quoting.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -125,6 +170,8 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
   const [finderIn, setFinderIn] = useState(null); // zone key | null
   const [outreachId, setOutreachId] = useState(null); // prospect id | null
   const senderName = state.employees.find((e) => e.id === state.activeEmployeeId)?.name || "";
+  // Anchor for AI-quote price ranges: the crew's own current average, not an AI guess.
+  const basePrice = jobs.length ? jobs.reduce((a, j) => a + (j.pay || 0), 0) / jobs.length : 45;
 
   const zones = clusterJobs(jobs)
     .map((zj) => zoneEconomics(zj, origin))
@@ -228,7 +275,7 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
               ))}
             </div>
             {zoneProspects.map((p) => (
-              <ProspectRow key={p.id} prospect={p} onUpdate={onUpdateProspect} onDelete={onDeleteProspect} onConvert={onConvertProspect} onMessage={(pr) => setOutreachId(pr.id)} />
+              <ProspectRow key={p.id} prospect={p} onUpdate={onUpdateProspect} onDelete={onDeleteProspect} onConvert={onConvertProspect} onMessage={(pr) => setOutreachId(pr.id)} apiKey={settings.anthropicApiKey} basePrice={basePrice} showToast={showToast} />
             ))}
             {finderIn === zoneKey && (
               <ZoneFinder
