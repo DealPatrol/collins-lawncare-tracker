@@ -122,3 +122,23 @@ export const IconExternal = (p) => (
 export const IconAlert = (p) => (
   <Svg {...p}><path d="M12 3 2.5 20h19L12 3Z" /><path d="M12 10v4.5" /><circle cx="12" cy="17.2" r="0.4" fill="currentColor" /></Svg>
 );
+
+export const IconSearch = (p) => (
+  <Svg {...p}><circle cx="10.5" cy="10.5" r="6.5" /><path d="m20 20-4.8-4.8" /></Svg>
+);
+
+export const IconSend = (p) => (
+  <Svg {...p}><path d="M21 3 10.5 13.5" /><path d="M21 3l-6.5 18-4-7.5L3 9.5 21 3Z" /></Svg>
+);
+
+export const IconCopy = (p) => (
+  <Svg {...p}><rect x="8.5" y="8.5" width="12" height="12" rx="2" /><path d="M5 15.5H4.5A1.5 1.5 0 0 1 3 14V4.5A1.5 1.5 0 0 1 4.5 3H14a1.5 1.5 0 0 1 1.5 1.5V5" /></Svg>
+);
+
+export const IconPhone = (p) => (
+  <Svg {...p}><path d="M21 16.9v2.6a1.9 1.9 0 0 1-2.1 1.9A19 19 0 0 1 2.6 5.1 1.9 1.9 0 0 1 4.5 3h2.6a1.9 1.9 0 0 1 1.9 1.6c.12.9.34 1.8.65 2.6a1.9 1.9 0 0 1-.43 2L8.1 10.3a16.2 16.2 0 0 0 5.6 5.6l1.1-1.12a1.9 1.9 0 0 1 2-.43c.83.31 1.7.53 2.6.65A1.9 1.9 0 0 1 21 16.9Z" /></Svg>
+);
+
+export const IconMail = (p) => (
+  <Svg {...p}><rect x="3" y="5" width="18" height="14" rx="2" /><path d="m3.5 7 8.5 6 8.5-6" /></Svg>
+);

@@ -1,5 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
-import { loadState, saveState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect } from "./store.js";
+import {
+  loadState, saveState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect,
+  encodeCrewInvite, decodeCrewInvite, applyCrewInvite,
+} from "./store.js";
+import { makeExpense } from "./reports.js";
+import { buildCompletionMessage, sendCompletionWebhook } from "./notify.js";
 import { getTodayKey, getWeekKey } from "./utils.js";
 import { getCurrentCoords } from "./location.js";
 
@@ -228,7 +233,6 @@ export default function App() {
   // subview: null | { kind: "detail", jobId } | { kind: "form", jobId? }
   const [subview, setSubview] = useState(null);
   const [toast, setToast] = useState(null); // { text, tone }
-  const [arriveSuggestion, setArriveSuggestion] = useState(null); // job
   const [now, setNow] = useState(0); // shared wall clock, ticks while anything runs
 
   useEffect(() => saveState(state), [state]);
@@ -276,7 +280,6 @@ export default function App() {
       const next = setWorkday(s, meId, { ...day, end: Date.now(), endCoords: coords });
       return { ...next, workdays: pruneWorkdays(next.workdays) };
     });
-    setArriveSuggestion(null);
   };
 
   // ── Jobs ──
@@ -403,6 +406,12 @@ export default function App() {
     setSubview(null);
   };
 
+  // Lightweight patch for fields outside the full JobForm save flow (e.g.
+  // seasonal outreach recording contact info / lastUpsellContactedAt).
+  const updateJob = (jobId, patch) => {
+    setState((s) => ({ ...s, jobs: s.jobs.map((j) => (j.id === jobId ? { ...j, ...patch } : j)) }));
+  };
+
   // ── Prospects (Growth Zones leads) ──
   const addProspect = (data) => {
     setState((s) => ({ ...s, prospects: [...(s.prospects || []), makeProspect(data)] }));
@@ -417,6 +426,15 @@ export default function App() {
 
   const deleteProspect = (id) => {
     setState((s) => ({ ...s, prospects: (s.prospects || []).filter((p) => p.id !== id) }));
+  };
+
+  // ── Expenses ──
+  const addExpense = (data) => {
+    setState((s) => ({ ...s, expenses: [...(s.expenses || []), makeExpense(data)] }));
+  };
+
+  const deleteExpense = (id) => {
+    setState((s) => ({ ...s, expenses: (s.expenses || []).filter((e) => e.id !== id) }));
   };
 
   // A won lead becomes a job: open the form prefilled as a monthly contract.
@@ -470,7 +488,6 @@ export default function App() {
       }
       return next;
     });
-    setArriveSuggestion(null);
   };
   const isMowedThisWeek = (job) => !!(job.weeklyMows?.[getWeekKey()]);
 
@@ -1012,8 +1029,9 @@ export default function App() {
         homeAddress,
         homeCoords,
 
-  const stopTimer = useCallback((jobId, { auto = false } = {}) => {
+  const stopTimer = (jobId, { auto = false } = {}) => {
     const now = Date.now();
+    const jobBefore = state.jobs.find((j) => j.id === jobId);
     setState((s) => {
       const job = s.jobs.find((j) => j.id === jobId);
       if (!job?.currentSessionStart) return s;
@@ -1598,7 +1616,22 @@ export default function App() {
       if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
       showToast("Left the job site — timer stopped and visit saved automatically.");
     }
-  }, [meId, showToast]);
+    if (jobBefore?.notifyOnComplete && jobBefore?.customerPhone && state.settings.notifyWebhookUrl) {
+      const empId = jobBefore.currentSessionEmployeeId || meId;
+      const crewName = state.employees.find((e) => e.id === empId)?.name || me?.name;
+      sendCompletionWebhook(state.settings.notifyWebhookUrl, {
+        to: jobBefore.customerPhone,
+        message: buildCompletionMessage(state.settings.notifyMessageTemplate, {
+          customer: jobBefore.customerName || null,
+          job: jobBefore.name,
+          crew: crewName,
+        }),
+        job: jobBefore.name,
+        address: jobBefore.address || "",
+        completedAt: now,
+      });
+    }
+  };
 
   // ── GPS tracking ──
   const pendingDistance = useRef(0);
@@ -1614,11 +1647,12 @@ export default function App() {
     });
   }, [meId]);
 
-  const onAutoStop = useCallback((job) => stopTimer(job.id, { auto: true }), [stopTimer]);
-  const onArrive = useCallback((job) => {
+  const onAutoStop = (job) => stopTimer(job.id, { auto: true });
+  const onArrive = (job) => {
     if (navigator.vibrate) navigator.vibrate(80);
-    setArriveSuggestion(job);
-  }, []);
+    startTimer(job.id);
+    showToast(`Arrived at ${job.name} — timer started automatically.`);
+  };
 
   const { lastFix, gpsError } = useGpsTracking({
     enabled: !!meId && (workdayRunning || !!activeJob),
@@ -1654,7 +1688,6 @@ export default function App() {
 
   const switchEmployee = (empId) => {
     setState((s) => ({ ...s, activeEmployeeId: empId }));
-    setArriveSuggestion(null);
   };
 
   const restoreState = (next) => {
@@ -1712,13 +1745,25 @@ export default function App() {
             </button>
           )}
         </div>
+  // ── Crew invites ──
+  // One-time merge of another crew member's jobs + roster onto this phone —
+  // see store.js for why this stands in for real sync for now. Returns a
+  // summary so the caller (Onboarding or Crew tab) can report what happened;
+  // throws with a user-facing message on a bad/garbled code.
+  const joinCrew = (code) => {
+    const invite = decodeCrewInvite(code);
+    const result = applyCrewInvite(state, invite);
+    setState(result.state);
+    return result;
+  };
+
   // Treat a detail subview whose job no longer exists as closed.
   const detailJob = subview?.kind === "detail" ? state.jobs.find((j) => j.id === subview.jobId) : null;
   const effectiveSubview = subview?.kind === "detail" && !detailJob ? null : subview;
 
   // ── Render ──
   if (!state.employees.length || !me) {
-    return <Onboarding employees={state.employees} onCreate={addEmployee} onPick={switchEmployee} />;
+    return <Onboarding employees={state.employees} onCreate={addEmployee} onPick={switchEmployee} onJoinCrew={joinCrew} />;
   }
 
   const openJob = (jobId) => setSubview({ kind: "detail", jobId });
@@ -1727,10 +1772,13 @@ export default function App() {
     state, me, myDay, workdayRunning, activeJob, lastFix, gpsError, todayKey, now,
     startWorkday, endWorkday, startTimer, stopTimer, toggleMow, openJob,
     onAddJob: () => setSubview({ kind: "form" }),
+    onUpdateJob: updateJob,
     onAddProspect: addProspect,
     onUpdateProspect: updateProspect,
     onDeleteProspect: deleteProspect,
     onConvertProspect: convertProspect,
+    onAddExpense: addExpense,
+    onDeleteExpense: deleteExpense,
     showToast,
   };
 
@@ -1760,11 +1808,11 @@ export default function App() {
     }
     if (tab === "jobs") return <JobsView {...shared} />;
     if (tab === "route") return <RouteView {...shared} />;
-    if (tab === "crew") return <CrewView {...shared} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onSwitchEmployee={switchEmployee} />;
+    if (tab === "crew") return <CrewView {...shared} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onSwitchEmployee={switchEmployee} onJoinCrew={joinCrew} getInviteCode={() => encodeCrewInvite(state)} />;
     if (tab === "settings") {
       return <SettingsView {...shared} onUpdateSettings={updateSettings} onRestore={restoreState} onSwitchEmployee={switchEmployee} />;
     }
-    return <TodayView {...shared} arriveSuggestion={arriveSuggestion} onDismissArrive={() => setArriveSuggestion(null)} onGoRoute={() => setTab("route")} />;
+    return <TodayView {...shared} onGoRoute={() => setTab("route")} />;
   };
 
   return (

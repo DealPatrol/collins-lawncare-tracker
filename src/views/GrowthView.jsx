@@ -4,7 +4,11 @@ import {
   haversineMeters, rateColorClass, routeDrags, zoneEconomics,
 } from "../utils.js";
 import { getCurrentCoords } from "../location.js";
-import { IconAlert, IconExternal, IconPin, IconPlus, IconTarget, IconTrash, IconZap } from "../icons.jsx";
+import { formatValueShort } from "../prospecting.js";
+import { estimateYard } from "../quoting.js";
+import { ZoneFinder, OutreachSheet } from "./ProspectorTools.jsx";
+import SeasonalOpportunity from "./SeasonalOutreach.jsx";
+import { IconAlert, IconExternal, IconPin, IconPlus, IconSearch, IconSend, IconTarget, IconTrash, IconZap } from "../icons.jsx";
 
 const STATUS_META = {
   new: { label: "New", cls: "badge-blue" },
@@ -24,40 +28,91 @@ function zoneBadge(zone) {
   return { label: `Needs +${zone.yardsToTarget} yard${zone.yardsToTarget === 1 ? "" : "s"}`, cls: "badge-amber" };
 }
 
-function ProspectRow({ prospect, onUpdate, onDelete, onConvert }) {
+function ProspectRow({ prospect, onUpdate, onDelete, onConvert, onMessage, apiKey, basePrice, showToast }) {
   const meta = STATUS_META[prospect.status] || STATUS_META.new;
+  const [estimating, setEstimating] = useState(false);
+  const est = prospect.aiEstimate;
+
+  const runEstimate = async () => {
+    if (!apiKey) {
+      showToast("Add your Anthropic API key in Settings → AI Yard Quoting first.", "amber");
+      return;
+    }
+    setEstimating(true);
+    try {
+      const result = await estimateYard({ apiKey, coords: prospect.coords, basePrice });
+      onUpdate(prospect.id, { aiEstimate: result });
+    } catch (e) {
+      showToast(e.message || "Estimate failed.", "red");
+    } finally {
+      setEstimating(false);
+    }
+  };
+
   return (
-    <div className="list-row" style={{ alignItems: "flex-start" }}>
-      <div style={{ flex: 1, minWidth: 0 }}>
-        <div style={{ fontWeight: 600, fontSize: 14 }}>{prospect.name}</div>
-        <div className="text-faint" style={{ fontSize: 12 }}>
-          {[prospect.address, prospect.targetMonthly ? `target ${formatMoney(prospect.targetMonthly)}/mo` : null]
-            .filter(Boolean).join(" · ") || "Lead"}
+    <div className="list-row" style={{ alignItems: "flex-start", flexDirection: "column" }}>
+      <div className="row-between" style={{ width: "100%" }}>
+        <div style={{ flex: 1, minWidth: 0 }}>
+          <div style={{ fontWeight: 600, fontSize: 14 }}>{prospect.name}</div>
+          <div className="text-faint" style={{ fontSize: 12 }}>
+            {[
+              prospect.owner || null,
+              prospect.address !== prospect.name ? prospect.address : null,
+              prospect.value ? formatValueShort(prospect.value) : null,
+              prospect.targetMonthly ? `target ${formatMoney(prospect.targetMonthly)}/mo` : null,
+            ].filter(Boolean).join(" · ") || "Lead"}
+          </div>
+          <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
+            {STATUS_ORDER.map((s) => (
+              <button
+                key={s}
+                className={`badge ${prospect.status === s ? STATUS_META[s].cls : "badge-dim"}`}
+                style={{ border: "none", cursor: "pointer", opacity: prospect.status === s ? 1 : 0.55 }}
+                onClick={() => onUpdate(prospect.id, { status: s })}
+              >
+                {STATUS_META[s].label}
+              </button>
+            ))}
+            <button className="badge badge-blue" style={{ border: "none", cursor: "pointer" }} onClick={() => onMessage(prospect)}>
+              <IconSend size={11} />{prospect.lastContactedAt ? "Message again" : "Message"}
+            </button>
+            {prospect.coords && (
+              <button className="badge badge-blue" style={{ border: "none", cursor: "pointer" }} disabled={estimating} onClick={runEstimate}>
+                <IconZap size={11} />{estimating ? "Estimating…" : est ? "Re-estimate" : "AI Quote"}
+              </button>
+            )}
+            {prospect.status === "won" && (
+              <button className="badge badge-green" style={{ border: "none", cursor: "pointer" }} onClick={() => onConvert(prospect)}>
+                <IconPlus size={11} />Add as job
+              </button>
+            )}
+          </div>
         </div>
-        <div style={{ display: "flex", gap: 6, marginTop: 6, flexWrap: "wrap" }}>
-          {STATUS_ORDER.map((s) => (
-            <button
-              key={s}
-              className={`badge ${prospect.status === s ? STATUS_META[s].cls : "badge-dim"}`}
-              style={{ border: "none", cursor: "pointer", opacity: prospect.status === s ? 1 : 0.55 }}
-              onClick={() => onUpdate(prospect.id, { status: s })}
-            >
-              {STATUS_META[s].label}
-            </button>
-          ))}
-          {prospect.status === "won" && (
-            <button className="badge badge-green" style={{ border: "none", cursor: "pointer" }} onClick={() => onConvert(prospect)}>
-              <IconPlus size={11} />Add as job
-            </button>
-          )}
+        <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
+          <span className={`badge ${meta.cls}`}>{meta.label}</span>
+          <button className="link-btn text-faint" style={{ padding: 2 }} onClick={() => onDelete(prospect.id)} aria-label="Delete lead">
+            <IconTrash size={14} />
+          </button>
         </div>
       </div>
-      <div style={{ display: "flex", flexDirection: "column", alignItems: "flex-end", gap: 6, flexShrink: 0 }}>
-        <span className={`badge ${meta.cls}`}>{meta.label}</span>
-        <button className="link-btn text-faint" style={{ padding: 2 }} onClick={() => onDelete(prospect.id)} aria-label="Delete lead">
-          <IconTrash size={14} />
-        </button>
-      </div>
+      {est && (
+        <div style={{ width: "100%", marginTop: 10, paddingTop: 10, borderTop: "1px solid var(--border)" }}>
+          <div className="row-between">
+            <span className="text-good" style={{ fontWeight: 800, fontSize: 15 }}>
+              {formatMoney(est.priceLow)}–{formatMoney(est.priceHigh)}
+            </span>
+            <span className="badge badge-dim" style={{ fontSize: 10.5 }}>{est.confidence} confidence</span>
+          </div>
+          <div className="text-faint" style={{ fontSize: 11.5, marginTop: 4 }}>
+            ~{est.estimatedSqFt?.toLocaleString()} sq ft · {est.sizeBucket} · {est.complexity}
+            {est.obstacles?.length ? ` · ${est.obstacles.join(", ")}` : ""}
+          </div>
+          {est.notes && <div className="text-faint" style={{ fontSize: 11.5, marginTop: 2, fontStyle: "italic" }}>{est.notes}</div>}
+          <div className="text-faint" style={{ fontSize: 10.5, marginTop: 6 }}>
+            Estimated from a satellite photo — confirm on-site before quoting.
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -108,10 +163,15 @@ function AddProspectForm({ defaultCoords, onAdd, onClose }) {
   );
 }
 
-export default function GrowthView({ state, openJob, onAddProspect, onUpdateProspect, onDeleteProspect, onConvertProspect }) {
+export default function GrowthView({ state, openJob, onAddProspect, onUpdateProspect, onDeleteProspect, onConvertProspect, onUpdateJob, showToast }) {
   const { jobs, settings, prospects = [] } = state;
   const origin = settings.homeCoords || null;
   const [addingIn, setAddingIn] = useState(null); // zone key (anchor id) | "unzoned" | null
+  const [finderIn, setFinderIn] = useState(null); // zone key | null
+  const [outreachId, setOutreachId] = useState(null); // prospect id | null
+  const senderName = state.employees.find((e) => e.id === state.activeEmployeeId)?.name || "";
+  // Anchor for AI-quote price ranges: the crew's own current average, not an AI guess.
+  const basePrice = jobs.length ? jobs.reduce((a, j) => a + (j.pay || 0), 0) / jobs.length : 45;
 
   const zones = clusterJobs(jobs)
     .map((zj) => zoneEconomics(zj, origin))
@@ -136,19 +196,29 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
 
   if (!zones.length) {
     return (
-      <div className="empty-state">
-        <div className="empty-icon"><IconTarget size={44} /></div>
-        <div style={{ fontWeight: 700, marginBottom: 6 }}>No zones to analyze yet</div>
-        <div style={{ fontSize: 13.5 }}>
-          Pin your yards on the map (edit a job → Pin Current Location) and this screen will group them into
-          zones, score each zone&apos;s real $/hr with drive time included, and show where one more yard makes the trip pay.
+      <>
+        <div className="empty-state">
+          <div className="empty-icon"><IconTarget size={44} /></div>
+          <div style={{ fontWeight: 700, marginBottom: 6 }}>No zones to analyze yet</div>
+          <div style={{ fontSize: 13.5 }}>
+            Pin your yards on the map (edit a job → Pin Current Location) and this screen will group them into
+            zones, score each zone&apos;s real $/hr with drive time included, and show where one more yard makes the trip pay.
+          </div>
         </div>
-      </div>
+        <SeasonalOpportunity
+          jobs={jobs} senderName={senderName} bizPhone={settings.bizPhone}
+          onUpdateJob={onUpdateJob} showToast={showToast}
+        />
+      </>
     );
   }
 
   return (
     <>
+      <SeasonalOpportunity
+        jobs={jobs} senderName={senderName} bizPhone={settings.bizPhone}
+        onUpdateJob={onUpdateJob} showToast={showToast}
+      />
       <div className="stat-grid" style={{ marginBottom: 12 }}>
         <div className="stat-tile">
           <div className="stat-value">{zones.length}</div>
@@ -205,14 +275,32 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
               ))}
             </div>
             {zoneProspects.map((p) => (
-              <ProspectRow key={p.id} prospect={p} onUpdate={onUpdateProspect} onDelete={onDeleteProspect} onConvert={onConvertProspect} />
+              <ProspectRow key={p.id} prospect={p} onUpdate={onUpdateProspect} onDelete={onDeleteProspect} onConvert={onConvertProspect} onMessage={(pr) => setOutreachId(pr.id)} apiKey={settings.anthropicApiKey} basePrice={basePrice} showToast={showToast} />
             ))}
+            {finderIn === zoneKey && (
+              <ZoneFinder
+                zone={zone}
+                jobs={jobs}
+                prospects={prospects}
+                token={settings.regridToken}
+                onAddProspect={onAddProspect}
+                showToast={showToast}
+                onClose={() => setFinderIn(null)}
+              />
+            )}
             {addingIn === zoneKey ? (
               <AddProspectForm defaultCoords={zone.centroid} onAdd={onAddProspect} onClose={() => setAddingIn(null)} />
             ) : (
-              <button className="btn btn-ghost btn-sm btn-block" style={{ marginTop: 10 }} onClick={() => setAddingIn(zoneKey)}>
-                <IconPlus size={14} />Log a lead in this zone
-              </button>
+              <div style={{ display: "flex", gap: 8, marginTop: 10 }}>
+                {finderIn !== zoneKey && (
+                  <button className="btn btn-blue btn-sm" style={{ flex: 1 }} onClick={() => setFinderIn(zoneKey)}>
+                    <IconSearch size={14} />Find best houses
+                  </button>
+                )}
+                <button className="btn btn-ghost btn-sm" style={{ flex: 1 }} onClick={() => setAddingIn(zoneKey)}>
+                  <IconPlus size={14} />Log a lead
+                </button>
+              </div>
             )}
           </div>
         );
@@ -224,7 +312,7 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
           Leads outside your current zones. Win 2–3 close together and they become a new zone worth driving to.
         </p>
         {unzonedProspects.map((p) => (
-          <ProspectRow key={p.id} prospect={p} onUpdate={onUpdateProspect} onDelete={onDeleteProspect} onConvert={onConvertProspect} />
+          <ProspectRow key={p.id} prospect={p} onUpdate={onUpdateProspect} onDelete={onDeleteProspect} onConvert={onConvertProspect} onMessage={(pr) => setOutreachId(pr.id)} />
         ))}
         {addingIn === "unzoned" ? (
           <AddProspectForm defaultCoords={null} onAdd={onAddProspect} onClose={() => setAddingIn(null)} />
@@ -267,6 +355,23 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
           <li><b>Be findable in the zone:</b> add these neighborhoods as service areas on your Google Business Profile and post before/afters in the local Facebook and Nextdoor groups.</li>
         </ul>
       </div>
+
+      {(() => {
+        const outreachProspect = outreachId ? prospects.find((p) => p.id === outreachId) : null;
+        if (!outreachProspect) return null;
+        const zone = zoneFor(outreachProspect);
+        return (
+          <OutreachSheet
+            prospect={outreachProspect}
+            yardCount={zone ? zone.jobs.length : jobs.length}
+            senderName={senderName}
+            bizPhone={settings.bizPhone}
+            onUpdate={onUpdateProspect}
+            showToast={showToast}
+            onClose={() => setOutreachId(null)}
+          />
+        );
+      })()}
     </>
   );
 }

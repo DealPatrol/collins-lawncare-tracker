@@ -3,16 +3,17 @@ import {
   formatClock, formatDuration, formatMiles, formatMoney, formatTime,
   isMowedThisWeek, lastNDayKeys, haversineMeters, getAvgTime,
 } from "../utils.js";
+import { expensesInRange, profitSummary } from "../reports.js";
 import { fetchWeather } from "../weather.js";
 import {
-  IconLeaf, IconPlay, IconStop, IconTruck, IconPin, IconTarget, IconZap,
+  IconLeaf, IconPlay, IconStop, IconTruck, IconTarget, IconZap,
   IconChevronRight, IconRoute, IconAlert,
 } from "../icons.jsx";
 
 export default function TodayView({
   state, me, myDay, workdayRunning, activeJob, lastFix, gpsError, now,
   startWorkday, endWorkday, startTimer, stopTimer, openJob,
-  arriveSuggestion, onDismissArrive, onGoRoute, onAddJob,
+  onGoRoute, onAddJob,
 }) {
   const { jobs, settings } = state;
   const [weather, setWeather] = useState(null);
@@ -59,6 +60,10 @@ export default function TodayView({
 
   const weekRevenue = jobs.reduce((a, j) => (isMowedThisWeek(j) ? a + j.pay : a), 0);
 
+  // Profit for the same rolling 7 days shown in the sparkline below.
+  const weekExpenses = useMemo(() => expensesInRange(state, week.keys), [state, week.keys]);
+  const profit = profitSummary(week.total, weekExpenses);
+
   return (
     <>
       <div className="header">
@@ -77,16 +82,6 @@ export default function TodayView({
       <div className="screen">
         {gpsError && (workdayRunning || activeJob) && (
           <div className="banner banner-amber"><IconAlert size={16} />{gpsError} — auto-stop and mileage paused.</div>
-        )}
-
-        {arriveSuggestion && !activeJob && (
-          <div className="banner banner-blue" style={{ justifyContent: "space-between" }}>
-            <span><IconPin size={15} style={{ verticalAlign: -2, marginRight: 6 }} />Arrived at <strong>{arriveSuggestion.name}</strong>?</span>
-            <span style={{ display: "flex", gap: 8, flexShrink: 0 }}>
-              <button className="btn btn-primary btn-sm" onClick={() => startTimer(arriveSuggestion.id)}>Start</button>
-              <button className="btn btn-ghost btn-sm" onClick={onDismissArrive}>Dismiss</button>
-            </span>
-          </div>
         )}
 
         {/* Weather */}
@@ -168,7 +163,7 @@ export default function TodayView({
               {settings.autoStop && activeJob.coords && (
                 <div className="geofence-note">
                   <IconTarget size={14} />
-                  Auto-stops when you leave the site ({activeJob.radius || settings.geofenceRadius} m zone)
+                  {settings.autoArriveDetect ? "Auto-started on arrival · auto-stops" : "Auto-stops"} when you leave the site ({activeJob.radius || settings.geofenceRadius} m zone)
                 </div>
               )}
               {settings.autoStop && !activeJob.coords && (
@@ -242,6 +237,17 @@ export default function TodayView({
               );
             })}
           </div>
+          {weekExpenses.length > 0 && (
+            <>
+              <div className="divider" />
+              <div className="row-between">
+                <span className="text-dim" style={{ fontSize: 12.5 }}>Revenue {formatMoney(profit.revenue)} − expenses {formatMoney(profit.cost)}</span>
+                <span className={profit.profit >= 0 ? "text-good" : "text-bad"} style={{ fontWeight: 800, fontSize: 14 }}>
+                  {formatMoney(profit.profit)} profit
+                </span>
+              </div>
+            </>
+          )}
         </div>
 
         {/* Today's stops */}
