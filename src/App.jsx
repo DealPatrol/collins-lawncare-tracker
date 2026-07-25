@@ -1,4 +1,6 @@
-import { useState, useEffect, useRef } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { loadState, saveState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect } from "./store.js";
+import { getTodayKey, getWeekKey } from "./utils.js";
 import { getCurrentCoords } from "./location.js";
 
 const STORAGE_KEY = "collins_lawncare_jobs";
@@ -201,37 +203,96 @@ export default function LawncareTracker() {
   const saveJobs = (updated) => setJobs(updated);
 
   // ── WORKDAY CONTROLS ──
+import { useGpsTracking } from "./useGpsTracking.js";
+import { IconHome, IconLeaf, IconMap, IconUsers, IconGear } from "./icons.jsx";
+import TodayView from "./views/TodayView.jsx";
+import JobsView from "./views/JobsView.jsx";
+import JobDetail from "./views/JobDetail.jsx";
+import JobForm from "./views/JobForm.jsx";
+import RouteView from "./views/RouteView.jsx";
+import CrewView from "./views/CrewView.jsx";
+import SettingsView from "./views/SettingsView.jsx";
+import Onboarding from "./views/Onboarding.jsx";
+
+const TABS = [
+  { id: "today", label: "Today", Icon: IconHome },
+  { id: "jobs", label: "Jobs", Icon: IconLeaf },
+  { id: "route", label: "Route", Icon: IconMap },
+  { id: "crew", label: "Crew", Icon: IconUsers },
+  { id: "settings", label: "Settings", Icon: IconGear },
+];
+
+export default function App() {
+  const [state, setState] = useState(loadState);
+  const [tab, setTab] = useState("today");
+  // subview: null | { kind: "detail", jobId } | { kind: "form", jobId? }
+  const [subview, setSubview] = useState(null);
+  const [toast, setToast] = useState(null); // { text, tone }
+  const [arriveSuggestion, setArriveSuggestion] = useState(null); // job
+  const [now, setNow] = useState(0); // shared wall clock, ticks while anything runs
+
+  useEffect(() => saveState(state), [state]);
+
+  const me = state.employees.find((e) => e.id === state.activeEmployeeId) || null;
+  const meId = me?.id;
+  const todayKey = getTodayKey();
+  const myDay = getWorkday(state, meId, todayKey);
+  const workdayRunning = !!(myDay?.start && !myDay?.end);
+
+  const activeJob =
+    state.jobs.find((j) => j.currentSessionStart && (!j.currentSessionEmployeeId || j.currentSessionEmployeeId === meId)) || null;
+
+  // Shared clock: 1s ticks while a timer/workday runs, lazy otherwise.
+  useEffect(() => {
+    const active = !!activeJob || workdayRunning;
+    const kickoff = setTimeout(() => setNow(Date.now()), 0);
+    const id = setInterval(() => setNow(Date.now()), active ? 1000 : 30000);
+    return () => { clearTimeout(kickoff); clearInterval(id); };
+  }, [activeJob, workdayRunning]);
+
+  const showToast = useCallback((text, tone = "green") => {
+    setToast({ text, tone });
+    setTimeout(() => setToast((t) => (t?.text === text ? null : t)), 4500);
+  }, []);
+
+  // ── Workday ──
   const startWorkday = async () => {
     let coords = null;
-    try {
-      coords = await getCurrentCoords();
-    } catch {
-      // Workday can still start without GPS.
-    }
-    setWorkday({
-      start: Date.now(),
-      startCoords: coords,
-      end: null,
-      date: getTodayKey(),
-      stops: [],
-    });
+    try { coords = await getCurrentCoords(); } catch { /* GPS optional to start the day */ }
+    setState((s) =>
+      setWorkday(s, meId, {
+        start: Date.now(), end: null, startCoords: coords, endCoords: null,
+        stops: [], distanceMeters: 0,
+      })
+    );
   };
 
   const endWorkday = async () => {
     let coords = null;
-    try {
-      coords = await getCurrentCoords();
-    } catch {
-      // Workday can still end without GPS.
-    }
-    const end = Date.now();
-    setWorkday(w => ({ ...w, end, endCoords: coords }));
-    setDayElapsed(w => workday?.start ? Math.floor((end - workday.start) / 1000) : w);
+    try { coords = await getCurrentCoords(); } catch { /* GPS optional to end the day */ }
+    setState((s) => {
+      const day = getWorkday(s, meId);
+      if (!day) return s;
+      const next = setWorkday(s, meId, { ...day, end: Date.now(), endCoords: coords });
+      return { ...next, workdays: pruneWorkdays(next.workdays) };
+    });
+    setArriveSuggestion(null);
   };
 
-  const resetWorkday = () => {
-    setWorkday(null);
-    setDayElapsed(0);
+  // ── Jobs ──
+  const upsertJob = (jobData, jobId) => {
+    setState((s) => {
+      if (jobId) {
+        return { ...s, jobs: s.jobs.map((j) => (j.id === jobId ? { ...j, ...jobData } : j)) };
+      }
+      const newJob = {
+        id: Date.now().toString(),
+        sessions: [], weeklyMows: {}, radius: null,
+        ...jobData,
+      };
+      return { ...s, jobs: [...s.jobs, newJob] };
+    });
+    setSubview(jobId ? { kind: "detail", jobId } : null);
   };
 
   // ── CREW MANAGEMENT ──
@@ -337,92 +398,79 @@ export default function LawncareTracker() {
     setEditingId(null);
     setForm({ name: "", address: "", pay: "", notes: "", lat: "", lng: "", priority: "medium", clientName: "", clientPhone: "" });
     setView("detail");
+  const deleteJob = (jobId) => {
+    setState((s) => ({ ...s, jobs: s.jobs.filter((j) => j.id !== jobId) }));
+    setSubview(null);
   };
 
-  const deleteJob = (id) => {
-    saveJobs(jobs.filter(j => j.id !== id));
-    setView("dashboard");
-    setSelectedJob(null);
+  // ── Prospects (Growth Zones leads) ──
+  const addProspect = (data) => {
+    setState((s) => ({ ...s, prospects: [...(s.prospects || []), makeProspect(data)] }));
   };
 
-  const getLocation = async (callback) => {
-    setGeoError("");
-    try {
-      const coords = await getCurrentCoords();
-      callback(coords);
-    } catch {
-      setGeoError("Could not get location");
-    }
+  const updateProspect = (id, patch) => {
+    setState((s) => ({
+      ...s,
+      prospects: (s.prospects || []).map((p) => (p.id === id ? { ...p, ...patch } : p)),
+    }));
   };
 
-  const startTimer = (jobId) => {
-    if (activeTimer) return;
-    setLocStatus("Getting location...");
-    getLocation((loc) => {
-      setLocStatus(`📍 ${loc.lat.toFixed(4)}, ${loc.lng.toFixed(4)}`);
-      const now = Date.now();
-      setActiveTimer(jobId);
-      setTimerStart(now);
-      // Log stop in workday
-      if (workday?.start && !workday?.end) {
-        const job = jobs.find(j => j.id === jobId);
-        setWorkday(w => ({
-          ...w, stops: [...(w.stops || []), { jobId, jobName: job?.name, arrivalTime: now, coords: loc }]
-        }));
-      }
-      saveJobs(jobs.map(j => j.id === jobId
-        ? { ...j, currentSessionStart: now, currentSessionLoc: loc }
-        : j
-      ));
+  const deleteProspect = (id) => {
+    setState((s) => ({ ...s, prospects: (s.prospects || []).filter((p) => p.id !== id) }));
+  };
+
+  // A won lead becomes a job: open the form prefilled as a monthly contract.
+  const convertProspect = (prospect) => {
+    updateProspect(prospect.id, { status: "won" });
+    setSubview({
+      kind: "form",
+      prefill: {
+        name: prospect.name,
+        address: prospect.address || "",
+        coords: prospect.coords || null,
+        billing: prospect.targetMonthly ? "monthly" : "visit",
+        monthlyRate: prospect.targetMonthly || null,
+      },
     });
-  };
-
-  const stopTimer = (jobId) => {
-    const job = jobs.find(j => j.id === jobId);
-    if (!job) return;
-    const duration = Math.floor((Date.now() - timerStart) / 1000);
-    const weekKey = getWeekKey();
-    const session = { date: new Date().toLocaleDateString(), duration, location: job.currentSessionLoc || null, pay: job.pay };
-    const updatedSessions = [...(job.sessions || []), session];
-    const weeklyMows = { ...(job.weeklyMows || {}), [weekKey]: true };
-    // Update workday stop with departure time
-    if (workday?.stops) {
-      setWorkday(w => ({
-        ...w,
-        stops: w.stops.map(s => s.jobId === jobId && !s.departTime
-          ? { ...s, departTime: Date.now(), duration }
-          : s
-        )
-      }));
-    }
-    saveJobs(jobs.map(j => j.id === jobId
-      ? { ...j, sessions: updatedSessions, weeklyMows, currentSessionStart: null, currentSessionLoc: null }
-      : j
-    ));
-    setActiveTimer(null);
-    setTimerStart(null);
-    setElapsed(0);
-    setLocStatus("");
   };
 
   const toggleMow = (jobId) => {
     const weekKey = getWeekKey();
-    saveJobs(jobs.map(j => j.id === jobId
-      ? { ...j, weeklyMows: { ...(j.weeklyMows || {}), [weekKey]: !(j.weeklyMows?.[weekKey]) } }
-      : j
-    ));
+    setState((s) => ({
+      ...s,
+      jobs: s.jobs.map((j) =>
+        j.id === jobId ? { ...j, weeklyMows: { ...(j.weeklyMows || {}), [weekKey]: !j.weeklyMows?.[weekKey] } } : j
+      ),
+    }));
   };
 
-  const getTotalTime = (job) => (job.sessions || []).reduce((a, s) => a + s.duration, 0);
-  const getAvgTime = (job) => {
-    const sessions = job.sessions || [];
-    if (!sessions.length) return 0;
-    return Math.floor(sessions.reduce((a, s) => a + s.duration, 0) / sessions.length);
-  };
-  const getHourlyRate = (job) => {
-    const avgSec = getAvgTime(job);
-    if (!avgSec) return 0;
-    return (job.pay / (avgSec / 3600));
+  // ── Timer ──
+  const startTimer = async (jobId) => {
+    if (activeJob) return;
+    let loc = null;
+    try { loc = await getCurrentCoords(); } catch { /* timer still works without a fix */ }
+    const now = Date.now();
+    setState((s) => {
+      const job = s.jobs.find((j) => j.id === jobId);
+      if (!job) return s;
+      let next = {
+        ...s,
+        jobs: s.jobs.map((j) =>
+          j.id === jobId
+            ? { ...j, currentSessionStart: now, currentSessionLoc: loc, currentSessionEmployeeId: meId }
+            : j
+        ),
+      };
+      const day = getWorkday(next, meId);
+      if (day?.start && !day.end) {
+        next = setWorkday(next, meId, {
+          ...day,
+          stops: [...(day.stops || []), { jobId, jobName: job.name, arrivalTime: now, coords: loc, employeeId: meId }],
+        });
+      }
+      return next;
+    });
+    setArriveSuggestion(null);
   };
   const isMowedThisWeek = (job) => !!(job.weeklyMows?.[getWeekKey()]);
 
@@ -963,47 +1011,34 @@ export default function LawncareTracker() {
         workday,
         homeAddress,
         homeCoords,
-      };
-      const blob = new Blob([JSON.stringify(data, null, 2)], { type: "application/json" });
-      const url = URL.createObjectURL(blob);
-      const a = document.createElement("a");
-      a.href = url;
-      a.download = `collins-lawncare-backup-${getTodayKey()}.json`;
-      a.click();
-      URL.revokeObjectURL(url);
-      setGeoError("Backup downloaded!");
-    };
 
-    const importData = (file) => {
-      const reader = new FileReader();
-      reader.onload = (e) => {
-        try {
-          const data = JSON.parse(e.target.result);
-          if (!Array.isArray(data.jobs)) throw new Error("Invalid backup");
-          setJobs(data.jobs);
-          const restoredWorkday = data.workday?.date === getTodayKey() ? data.workday : null;
-          setWorkday(restoredWorkday);
-          if (data.homeAddress != null) {
-            setHomeAddress(data.homeAddress);
-            localStorage.setItem(HOME_KEY, data.homeAddress);
-          }
-          if (data.homeCoords) {
-            setHomeCoords(data.homeCoords);
-            localStorage.setItem(HOME_COORDS_KEY, JSON.stringify(data.homeCoords));
-          }
-          const running = getRunningJob(data.jobs);
-          setActiveTimer(running?.id ?? null);
-          setTimerStart(running?.currentSessionStart ?? null);
-          setElapsed(running?.currentSessionStart
-            ? Math.floor((Date.now() - running.currentSessionStart) / 1000)
-            : 0);
-          setLocStatus(running?.currentSessionLoc
-            ? `📍 ${running.currentSessionLoc.lat.toFixed(4)}, ${running.currentSessionLoc.lng.toFixed(4)}`
-            : "");
-          setGeoError("Backup restored!");
-        } catch {
-          setGeoError("Could not restore backup — invalid file");
-        }
+  const stopTimer = useCallback((jobId, { auto = false } = {}) => {
+    const now = Date.now();
+    setState((s) => {
+      const job = s.jobs.find((j) => j.id === jobId);
+      if (!job?.currentSessionStart) return s;
+      const duration = Math.floor((now - job.currentSessionStart) / 1000);
+      const session = {
+        date: new Date().toLocaleDateString(),
+        dayKey: getTodayKey(),
+        duration,
+        location: job.currentSessionLoc || null,
+        pay: job.pay,
+        employeeId: job.currentSessionEmployeeId || null,
+        auto,
+      };
+      let next = {
+        ...s,
+        jobs: s.jobs.map((j) =>
+          j.id === jobId
+            ? {
+                ...j,
+                sessions: [...(j.sessions || []), session],
+                weeklyMows: { ...(j.weeklyMows || {}), [getWeekKey()]: true },
+                currentSessionStart: null, currentSessionLoc: null, currentSessionEmployeeId: null,
+              }
+            : j
+        ),
       };
       reader.readAsText(file);
     };
@@ -1547,11 +1582,87 @@ export default function LawncareTracker() {
             </div>
           )}
         </div>
+      const empId = job.currentSessionEmployeeId || meId;
+      const day = getWorkday(next, empId);
+      if (day?.stops) {
+        next = setWorkday(next, empId, {
+          ...day,
+          stops: day.stops.map((st) =>
+            st.jobId === jobId && !st.departTime ? { ...st, departTime: now, duration } : st
+          ),
+        }, getTodayKey());
+      }
+      return next;
+    });
+    if (auto) {
+      if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+      showToast("Left the job site — timer stopped and visit saved automatically.");
+    }
+  }, [meId, showToast]);
 
-        <button style={styles.deleteBtn} onClick={() => deleteJob(job.id)}>🗑 Remove Job</button>
-      </div>
-    );
-  }
+  // ── GPS tracking ──
+  const pendingDistance = useRef(0);
+  const onDistance = useCallback((meters) => {
+    pendingDistance.current += meters;
+    if (pendingDistance.current < 25) return; // batch small increments
+    const add = pendingDistance.current;
+    pendingDistance.current = 0;
+    setState((s) => {
+      const day = getWorkday(s, meId);
+      if (!day || day.end) return s;
+      return setWorkday(s, meId, { ...day, distanceMeters: (day.distanceMeters || 0) + add });
+    });
+  }, [meId]);
+
+  const onAutoStop = useCallback((job) => stopTimer(job.id, { auto: true }), [stopTimer]);
+  const onArrive = useCallback((job) => {
+    if (navigator.vibrate) navigator.vibrate(80);
+    setArriveSuggestion(job);
+  }, []);
+
+  const { lastFix, gpsError } = useGpsTracking({
+    enabled: !!meId && (workdayRunning || !!activeJob),
+    config: {
+      activeJob,
+      jobs: state.jobs,
+      geofenceRadius: state.settings.geofenceRadius,
+      autoStop: state.settings.autoStop,
+      autoArriveDetect: state.settings.autoArriveDetect,
+    },
+    onDistance,
+    onAutoStop,
+    onArrive,
+  });
+
+  // ── Settings / crew ──
+  const updateSettings = (patch) => setState((s) => ({ ...s, settings: { ...s.settings, ...patch } }));
+
+  const addEmployee = (name, role) => {
+    setState((s) => {
+      const emp = makeEmployee(name, role, s.employees);
+      return { ...s, employees: [...s.employees, emp], activeEmployeeId: s.activeEmployeeId || emp.id };
+    });
+  };
+
+  const removeEmployee = (empId) => {
+    setState((s) => ({
+      ...s,
+      employees: s.employees.filter((e) => e.id !== empId),
+      activeEmployeeId: s.activeEmployeeId === empId ? (s.employees.find((e) => e.id !== empId)?.id ?? null) : s.activeEmployeeId,
+    }));
+  };
+
+  const switchEmployee = (empId) => {
+    setState((s) => ({ ...s, activeEmployeeId: empId }));
+    setArriveSuggestion(null);
+  };
+
+  const restoreState = (next) => {
+    setState(next);
+    setSubview(null);
+    setTab("today");
+    showToast("Backup restored.");
+  };
 
   // ── DASHBOARD ──
   return (
@@ -1601,88 +1712,66 @@ export default function LawncareTracker() {
             </button>
           )}
         </div>
+  // Treat a detail subview whose job no longer exists as closed.
+  const detailJob = subview?.kind === "detail" ? state.jobs.find((j) => j.id === subview.jobId) : null;
+  const effectiveSubview = subview?.kind === "detail" && !detailJob ? null : subview;
 
-        {(workdayRunning || workdayDone) && (
-          <div style={{ display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 }}>
-            <div style={styles.dayStat}>
-              <div style={{ ...styles.dayStatVal, color: workdayRunning ? "#4ade80" : "#60a5fa", fontVariantNumeric: "tabular-nums" }}>
-                {formatDuration(dayElapsed)}
-              </div>
-              <div style={styles.dayStatLbl}>Time Out</div>
-            </div>
-            <div style={styles.dayStat}>
-              <div style={styles.dayStatVal}>{workday?.stops?.length || 0}</div>
-              <div style={styles.dayStatLbl}>Yards Done</div>
-            </div>
-            <div style={styles.dayStat}>
-              <div style={{ ...styles.dayStatVal, color: "#4ade80" }}>{formatMoney(todayRevenue)}</div>
-              <div style={styles.dayStatLbl}>Today's Pay</div>
-            </div>
-          </div>
-        )}
+  // ── Render ──
+  if (!state.employees.length || !me) {
+    return <Onboarding employees={state.employees} onCreate={addEmployee} onPick={switchEmployee} />;
+  }
 
-        {workday?.start && (
-          <div style={{ fontSize: 11, color: "#4b5563", marginTop: 8, display: "flex", justifyContent: "space-between" }}>
-            <span>Left home: {formatTime(workday.start)}</span>
-            {workday.end && <span>Returned: {formatTime(workday.end)}</span>}
-          </div>
-        )}
-      </div>
+  const openJob = (jobId) => setSubview({ kind: "detail", jobId });
 
-      {/* Week Summary */}
-      <div style={styles.summaryRow}>
-        <div style={styles.summaryCard}>
-          <div style={styles.summaryVal}>{jobsDoneThisWeek}/{jobs.length}</div>
-          <div style={styles.summaryLbl}>Mowed This Week</div>
-        </div>
-        <div style={styles.summaryCard}>
-          <div style={{ ...styles.summaryVal, color: "#4ade80" }}>{formatMoney(totalWeeklyRevenue)}</div>
-          <div style={styles.summaryLbl}>Week Revenue</div>
-        </div>
-        <div style={styles.summaryCard}>
-          <div style={{ ...styles.summaryVal, color: getRateColor(avgRate) }}>
-            {avgRate ? `$${avgRate.toFixed(0)}/hr` : "—"}
-          </div>
-          <div style={styles.summaryLbl}>Avg Rate</div>
-        </div>
-      </div>
+  const shared = {
+    state, me, myDay, workdayRunning, activeJob, lastFix, gpsError, todayKey, now,
+    startWorkday, endWorkday, startTimer, stopTimer, toggleMow, openJob,
+    onAddJob: () => setSubview({ kind: "form" }),
+    onAddProspect: addProspect,
+    onUpdateProspect: updateProspect,
+    onDeleteProspect: deleteProspect,
+    onConvertProspect: convertProspect,
+    showToast,
+  };
 
-      {activeTimer && (
-        <div style={styles.activeTimerBanner}>
-          ⏱ Timer running on <strong>{jobs.find(j => j.id === activeTimer)?.name}</strong> — {formatDuration(elapsed)}
-        </div>
-      )}
+  const renderScreen = () => {
+    if (effectiveSubview?.kind === "form") {
+      const subJobId = effectiveSubview.jobId;
+      return (
+        <JobForm
+          job={state.jobs.find((j) => j.id === subJobId) || null}
+          prefill={effectiveSubview.prefill || null}
+          settings={state.settings}
+          onSave={(data) => upsertJob(data, subJobId)}
+          onBack={() => setSubview(subJobId ? { kind: "detail", jobId: subJobId } : null)}
+        />
+      );
+    }
+    if (effectiveSubview?.kind === "detail") {
+      return (
+        <JobDetail
+          {...shared}
+          job={detailJob}
+          onEdit={() => setSubview({ kind: "form", jobId: detailJob.id })}
+          onDelete={() => deleteJob(detailJob.id)}
+          onBack={() => setSubview(null)}
+        />
+      );
+    }
+    if (tab === "jobs") return <JobsView {...shared} />;
+    if (tab === "route") return <RouteView {...shared} />;
+    if (tab === "crew") return <CrewView {...shared} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onSwitchEmployee={switchEmployee} />;
+    if (tab === "settings") {
+      return <SettingsView {...shared} onUpdateSettings={updateSettings} onRestore={restoreState} onSwitchEmployee={switchEmployee} />;
+    }
+    return <TodayView {...shared} arriveSuggestion={arriveSuggestion} onDismissArrive={() => setArriveSuggestion(null)} onGoRoute={() => setTab("route")} />;
+  };
 
-      {jobs.length === 0 ? (
-        <div style={styles.emptyState}>
-          <div style={{ fontSize: 48, marginBottom: 12 }}>🌿</div>
-          <div style={{ color: "#94a3b8", fontSize: 15 }}>No jobs yet. Add your first yard.</div>
-          <button style={{ ...styles.primaryBtn, marginTop: 16 }} onClick={() => setView("add")}>Add First Job</button>
-        </div>
-      ) : (
-        <div style={styles.jobList}>
-          {jobs.map(j => {
-            const mowed = isMowedThisWeek(j);
-            const rate = getHourlyRate(j);
-            const isRunning = activeTimer === j.id;
-            return (
-              <div key={j.id} style={{ ...styles.jobCard, borderLeft: `3px solid ${mowed ? "#4ade80" : "#374151"}` }}
-                onClick={() => openDetail(j)}>
-                <div style={styles.jobCardLeft}>
-                  <div style={styles.jobName}>{j.name}</div>
-                  {j.address && <div style={styles.jobAddr}>{j.address}</div>}
-                  <div style={styles.jobMeta}>
-                    {mowed ? "✅ Mowed" : "❌ Not mowed"} · {isRunning ? <span style={{ color: "#facc15" }}>⏱ Running</span> : (formatDuration(getAvgTime(j)) + " avg")}
-                  </div>
-                </div>
-                <div style={styles.jobCardRight}>
-                  <div style={styles.jobPay}>{formatMoney(j.pay)}</div>
-                  {rate > 0 && <div style={{ color: getRateColor(rate), fontSize: 12, fontWeight: 600 }}>${rate.toFixed(0)}/hr</div>}
-                  <div style={styles.jobSessions}>{(j.sessions || []).length} visits</div>
-                </div>
-              </div>
-            );
-          })}
+  return (
+    <div className="app">
+      {toast && (
+        <div style={{ position: "fixed", top: "calc(10px + env(safe-area-inset-top))", left: 16, right: 16, zIndex: 50, maxWidth: 528, margin: "0 auto" }}>
+          <div className={`banner banner-${toast.tone}`} style={{ boxShadow: "var(--shadow-float)" }}>{toast.text}</div>
         </div>
       )}
 
@@ -1757,3 +1846,19 @@ const styles = {
   mapsBtn: { display: "block", background: "#f0f9ff", border: "1px solid #bfdbfe", color: "#0369a1", borderRadius: 10, padding: "13px", fontWeight: 600, fontSize: 14, textAlign: "center", textDecoration: "none", marginBottom: 12 },
   navBtn: { background: "none", border: "none", color: "#64748b", fontSize: 13, cursor: "pointer", padding: "4px 8px" },
 };
+      {renderScreen()}
+      {!effectiveSubview && (
+        <nav className="tabbar">
+          <div className="tabbar-inner">
+            {TABS.map(({ id, label, Icon }) => (
+              <button key={id} className={`tab${tab === id ? " active" : ""}`} onClick={() => { setTab(id); setSubview(null); }}>
+                <Icon size={21} strokeWidth={tab === id ? 2.4 : 2} />
+                {label}
+              </button>
+            ))}
+          </div>
+        </nav>
+      )}
+    </div>
+  );
+}
