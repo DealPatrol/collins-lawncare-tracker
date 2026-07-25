@@ -51,7 +51,9 @@ export function formatTime(ts) {
 
 export function formatMoney(val) {
   const n = parseFloat(val || 0);
-  return `$${n.toFixed(n % 1 === 0 ? 0 : 2)}`;
+  const sign = n < 0 ? "-" : "";
+  const abs = Math.abs(n);
+  return `${sign}$${abs.toFixed(abs % 1 === 0 ? 0 : 2)}`;
 }
 
 export function formatMiles(meters) {
