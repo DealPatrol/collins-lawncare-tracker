@@ -40,10 +40,15 @@ export default function TodayView({
   const doneCount = jobs.length - pending.length;
 
   // Nearest pending job from the last GPS fix (or home) — "what's next" hint.
+  // High-priority yards jump the line: nearest-among-high-priority beats
+  // nearest-overall whenever any high-priority yard is still pending.
   const nextUp = useMemo(() => {
     const origin = lastFix || settings.homeCoords;
-    const candidates = pending.filter((j) => j.coords && j.id !== activeJob?.id);
-    if (!origin || !candidates.length) return pending.find((j) => j.id !== activeJob?.id) || null;
+    const eligible = pending.filter((j) => j.id !== activeJob?.id);
+    const highPriority = eligible.filter((j) => j.priority === "high");
+    const pool = highPriority.length ? highPriority : eligible;
+    const candidates = pool.filter((j) => j.coords);
+    if (!origin || !candidates.length) return pool[0] || null;
     return [...candidates].sort((a, b) => haversineMeters(origin, a.coords) - haversineMeters(origin, b.coords))[0];
   }, [lastFix, settings.homeCoords, pending, activeJob]);
 
@@ -183,7 +188,9 @@ export default function TodayView({
               <div style={{ display: "flex", alignItems: "center", gap: 11, minWidth: 0 }}>
                 <div className="brand-mark" style={{ background: "var(--surface-2)", color: "var(--green)", boxShadow: "none" }}><IconZap size={18} /></div>
                 <div style={{ minWidth: 0 }}>
-                  <div className="text-faint" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em" }}>NEXT UP</div>
+                  <div className="text-faint" style={{ fontSize: 11, fontWeight: 700, letterSpacing: "0.06em" }}>
+                    NEXT UP{nextUp.priority === "high" && <span className="badge badge-red" style={{ marginLeft: 6, fontSize: 9.5, letterSpacing: 0 }}>HIGH PRIORITY</span>}
+                  </div>
                   <div style={{ fontWeight: 700, fontSize: 14.5, whiteSpace: "nowrap", overflow: "hidden", textOverflow: "ellipsis" }}>{nextUp.name}</div>
                   <div className="text-faint" style={{ fontSize: 12 }}>
                     {lastFix && nextUp.coords ? `${formatMiles(haversineMeters(lastFix, nextUp.coords))} away · ` : ""}

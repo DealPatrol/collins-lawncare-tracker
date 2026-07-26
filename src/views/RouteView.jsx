@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   estimateDriveMeters, estimateDriveSeconds, formatDuration, formatMiles,
-  formatMoney, formatTime, getAvgTime, isMowedThisWeek, optimizeRoute,
+  formatMoney, formatTime, getAvgTime, isMowedThisWeek, priorityMeta, smartRoute,
 } from "../utils.js";
 import { IconHome, IconMap, IconExternal, IconPin, IconAlert, IconRoute } from "../icons.jsx";
 import GrowthView from "./GrowthView.jsx";
@@ -19,9 +19,12 @@ export default function RouteView(props) {
   const routable = pending.filter((j) => j.coords);
   const unroutable = pending.filter((j) => !j.coords);
 
-  // Optimized plan with per-leg drive estimates and a rolling ETA.
+  // Smart-routed plan: high-priority jobs first, then normal, then low —
+  // travel-optimized within each tier. With no priorities set this is
+  // identical to a plain nearest-neighbor route.
   // (React Compiler memoizes this; the job counts are small anyway.)
-  const ordered = optimizeRoute(origin || routable[0]?.coords, routable);
+  const ordered = smartRoute(origin || routable[0]?.coords, routable);
+  const hasPriorities = routable.some((j) => j.priority && j.priority !== "normal");
   const planStops = [];
   let cursor = origin || ordered[0]?.coords;
   let clock = now;
@@ -107,11 +110,19 @@ export default function RouteView(props) {
         {mode === "plan" && plan.stops.length > 0 && (
           <div className="card">
             <div className="row-between" style={{ marginBottom: 4 }}>
-              <div className="section-title" style={{ margin: 0 }}><IconRoute size={13} style={{ verticalAlign: -2, marginRight: 5 }} />Optimized Order</div>
+              <div className="section-title" style={{ margin: 0 }}>
+                <IconRoute size={13} style={{ verticalAlign: -2, marginRight: 5 }} />
+                {hasPriorities ? "Smart Routing Order" : "Optimized Order"}
+              </div>
               <span className="text-faint" style={{ fontSize: 12 }}>
                 ~{formatDuration(totalWorkSec)} of work · done ≈ {formatTime(plan.doneBy)}
               </span>
             </div>
+            {hasPriorities && (
+              <p className="text-faint" style={{ fontSize: 11.5, marginTop: -2, marginBottom: 10, lineHeight: 1.5 }}>
+                High-priority yards are routed first, low-priority pushed to the end — travel-optimized within each group.
+              </p>
+            )}
             <div className="route-line">
               {origin && (
                 <div className="route-stop home">
@@ -128,7 +139,14 @@ export default function RouteView(props) {
                   )}
                   <div className="row-between">
                     <div>
-                      <div style={{ fontWeight: 700, fontSize: 14 }}>{i + 1}. {job.name}</div>
+                      <div style={{ fontWeight: 700, fontSize: 14 }}>
+                        {i + 1}. {job.name}
+                        {job.priority && job.priority !== "normal" && (
+                          <span className={`badge ${priorityMeta(job.priority).cls}`} style={{ marginLeft: 8, fontSize: 10, verticalAlign: 2 }}>
+                            {job.priority === "high" ? "High" : "Low"}
+                          </span>
+                        )}
+                      </div>
                       <div className="text-faint" style={{ fontSize: 12 }}>
                         ETA {formatTime(eta)} · ~{formatDuration(workSec)} on site
                       </div>

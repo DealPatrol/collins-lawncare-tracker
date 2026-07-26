@@ -1,7 +1,7 @@
 import { useState } from "react";
 import {
   formatClock, formatDuration, formatMoney, getAvgTime, getHourlyRate,
-  getTotalTime, isMowedThisWeek, rateColorClass,
+  getTotalTime, isMowedThisWeek, priorityMeta, rateColorClass,
 } from "../utils.js";
 import {
   IconChevronLeft, IconEdit, IconPin, IconPlay, IconStop, IconTarget,
@@ -38,6 +38,11 @@ export default function JobDetail({
       </div>
 
       <div className="screen">
+        {job.priority && job.priority !== "normal" && (
+          <div className="row-between" style={{ margin: "0 2px 10px" }}>
+            <span className={`badge ${priorityMeta(job.priority).cls}`}>{priorityMeta(job.priority).label}</span>
+          </div>
+        )}
         {(job.address || mapsUrl) && (
           <div className="row-between" style={{ margin: "0 2px 12px" }}>
             <span className="text-dim" style={{ fontSize: 13, display: "flex", alignItems: "center", gap: 5 }}>
