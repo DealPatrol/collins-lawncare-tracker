@@ -1,6 +1,6 @@
 import { initializeApp } from "firebase/app";
-import { getFirestore } from "firebase/firestore";
 import { getAuth } from "firebase/auth";
+import { getFirestore } from "firebase/firestore";
 
 const firebaseConfig = {
   apiKey: import.meta.env.VITE_FIREBASE_API_KEY,
@@ -20,24 +20,23 @@ export function isFirebaseConfigured() {
   );
 }
 
-let app;
-let db;
-let auth;
+/** Initialized Firebase app, or null when env vars are missing. */
+export const firebaseApp = isFirebaseConfigured() ? initializeApp(firebaseConfig) : null;
+
+/** Firebase Auth — used for email/password sign-in. */
+export const auth = firebaseApp ? getAuth(firebaseApp) : null;
+
+/** Cloud Firestore — used for per-user data sync. */
+export const db = firebaseApp ? getFirestore(firebaseApp) : null;
 
 export function getFirebaseApp() {
-  if (!isFirebaseConfigured()) return null;
-  if (!app) app = initializeApp(firebaseConfig);
-  return app;
+  return firebaseApp;
 }
 
 export function getDb() {
-  if (!getFirebaseApp()) return null;
-  if (!db) db = getFirestore(getFirebaseApp());
   return db;
 }
 
 export function getFirebaseAuth() {
-  if (!getFirebaseApp()) return null;
-  if (!auth) auth = getAuth(getFirebaseApp());
   return auth;
 }

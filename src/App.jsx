@@ -156,21 +156,28 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
       : "");
   }, []);
 
-  const { syncing, syncError } = useFirestoreSync(
+  const { syncing, syncError, cloudActive } = useFirestoreSync(
     user,
     { jobs, workday, homeAddress, homeCoords },
     { setJobs, setWorkday, setHomeAddress, setHomeCoords, restoreTimerState }
   );
 
-  // Persist jobs locally
+  // Persist locally (offline fallback — always active)
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
   }, [jobs]);
 
-  // Persist workday
   useEffect(() => {
     localStorage.setItem(DAY_KEY, JSON.stringify(workday));
   }, [workday]);
+
+  useEffect(() => {
+    localStorage.setItem(HOME_KEY, homeAddress);
+  }, [homeAddress]);
+
+  useEffect(() => {
+    localStorage.setItem(HOME_COORDS_KEY, JSON.stringify(homeCoords));
+  }, [homeCoords]);
 
 
   useEffect(() => {
@@ -524,8 +531,14 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
           <div style={styles.card}>
             <div style={styles.sectionTitle}>Account</div>
             <p style={{ color: "#94a3b8", fontSize: 13, marginBottom: 8 }}>{user.email}</p>
-            <p style={{ color: syncError ? "#f87171" : syncing ? "#facc15" : "#4ade80", fontSize: 12, marginBottom: 12 }}>
-              {syncError ? `⚠ ${syncError}` : syncing ? "☁ Syncing to cloud…" : "☁ Synced to Firestore"}
+            <p style={{ color: syncError ? "#f87171" : syncing ? "#facc15" : cloudActive ? "#4ade80" : "#94a3b8", fontSize: 12, marginBottom: 12 }}>
+              {syncError
+                ? `⚠ Cloud unavailable — using local backup. ${syncError}`
+                : syncing
+                  ? "☁ Syncing to Firestore…"
+                  : cloudActive
+                    ? "☁ Synced to Firestore"
+                    : "☁ Connecting to cloud…"}
             </p>
             <button
               style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", width: "100%", marginBottom: 0 }}

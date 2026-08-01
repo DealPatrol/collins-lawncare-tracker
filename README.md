@@ -36,38 +36,22 @@ npm run ios:open    # open in Xcode
 
 ## Firebase (project: `lawncare-72560`)
 
-Email/password auth and Firestore cloud sync are integrated. On first sign-in, local data migrates to `users/{uid}/data/app` in Firestore.
-
-### 1. Add your web app keys
+Email/password auth and Firestore cloud sync are integrated. Data syncs to `users/{uid}/data/app` when signed in, with **localStorage as an offline fallback**.
 
 ```bash
-cp .env.example .env
-# Fill in VITE_FIREBASE_API_KEY, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
-# from Firebase Console → Project Settings → Your apps → Web app
+cp .env.example .env   # keys are pre-filled for lawncare-72560
+npm run dev
 ```
 
-Or auto-fetch after `firebase login`:
-
-```bash
-npm run firebase:keys lawncare-72560
-```
-
-### 2. Deploy security rules (required — production mode blocks all reads/writes by default)
+Deploy Firestore security rules (required for production mode):
 
 ```bash
 npx -y firebase-tools@latest login
 npm run firebase:deploy:rules
 ```
 
-### 3. iOS config
-
-```bash
-npm run firebase:keys lawncare-72560
-```
-
-This also writes `ios/App/App/GoogleService-Info.plist`.
-
-See **[docs/KEYS.md](./docs/KEYS.md)** for details.
+- **Security rules audit:** [docs/FIRESTORE_RULES_AUDIT.md](./docs/FIRESTORE_RULES_AUDIT.md)
+- **iOS native Firebase (stubbed):** [docs/IOS_FIREBASE.md](./docs/IOS_FIREBASE.md)
 
 ## Built With
 - React + Vite

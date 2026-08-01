@@ -1,14 +1,19 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
-import { getDb } from "./firebase.js";
+import { db } from "./firebase.js";
 
 function getTodayKey() {
   return new Date().toISOString().split("T")[0];
 }
 
+/**
+ * Syncs app data to Firestore when signed in.
+ * Always falls back to localStorage (written by App.jsx) if cloud is unavailable.
+ */
 export function useFirestoreSync(user, data, setters) {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState("");
+  const [cloudActive, setCloudActive] = useState(false);
   const remoteLoaded = useRef(!user);
   const skipSave = useRef(true);
   const initialLocal = useRef(null);
@@ -20,10 +25,9 @@ export function useFirestoreSync(user, data, setters) {
     if (user) {
       initialLocal.current = { jobs, workday, homeAddress, homeCoords };
     }
-  }, [user?.uid]); // capture local data once per login
+  }, [user?.uid]);
 
   useEffect(() => {
-    const db = getDb();
     if (!user || !db) {
       remoteLoaded.current = true;
       skipSave.current = false;
@@ -47,6 +51,8 @@ export function useFirestoreSync(user, data, setters) {
             });
             remoteLoaded.current = true;
             skipSave.current = false;
+            setCloudActive(true);
+            setSyncError("");
             return;
           }
 
@@ -60,14 +66,18 @@ export function useFirestoreSync(user, data, setters) {
           if (Array.isArray(remote.jobs)) restoreTimerState(remote.jobs);
           remoteLoaded.current = true;
           skipSave.current = false;
+          setCloudActive(true);
+          setSyncError("");
         } catch (err) {
           setSyncError(err?.message || "Cloud sync failed");
+          setCloudActive(false);
           remoteLoaded.current = true;
           skipSave.current = false;
         }
       },
       (err) => {
         setSyncError(err?.message || "Cloud sync failed");
+        setCloudActive(false);
         remoteLoaded.current = true;
         skipSave.current = false;
       }
@@ -77,7 +87,6 @@ export function useFirestoreSync(user, data, setters) {
   }, [user?.uid, setJobs, setWorkday, setHomeAddress, setHomeCoords, restoreTimerState]);
 
   useEffect(() => {
-    const db = getDb();
     if (!user || !db || !remoteLoaded.current) return;
     if (skipSave.current) return;
 
@@ -91,8 +100,10 @@ export function useFirestoreSync(user, data, setters) {
           { merge: true }
         );
         setSyncError("");
+        setCloudActive(true);
       } catch (err) {
         setSyncError(err?.message || "Could not save to cloud");
+        setCloudActive(false);
       } finally {
         setSyncing(false);
       }
@@ -101,5 +112,5 @@ export function useFirestoreSync(user, data, setters) {
     return () => clearTimeout(timer);
   }, [user?.uid, jobs, workday, homeAddress, homeCoords]);
 
-  return { syncing, syncError };
+  return { syncing, syncError, cloudActive };
 }

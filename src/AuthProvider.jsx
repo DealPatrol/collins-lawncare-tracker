@@ -5,7 +5,7 @@ import {
   createUserWithEmailAndPassword,
   signOut,
 } from "firebase/auth";
-import { getFirebaseAuth, isFirebaseConfigured } from "./firebase.js";
+import { auth, getFirebaseAuth, isFirebaseConfigured } from "./firebase.js";
 import { AuthContext } from "./authContext.js";
 
 export function AuthProvider({ children }) {
@@ -14,7 +14,6 @@ export function AuthProvider({ children }) {
   const [loading, setLoading] = useState(firebaseEnabled);
 
   useEffect(() => {
-    const auth = getFirebaseAuth();
     if (!auth) return;
     return onAuthStateChanged(auth, (nextUser) => {
       setUser(nextUser);
