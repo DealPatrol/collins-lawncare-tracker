@@ -37,10 +37,19 @@ This creates:
 - `.env` — web SDK keys (`VITE_FIREBASE_*`)
 - `ios/App/App/GoogleService-Info.plist` — iOS config
 
-Default Firebase project ID: `collins-lawncare`. Use a custom ID:
+Default Firebase project ID: `lawncare-72560`. Use a custom ID:
 
 ```bash
 ./scripts/fetch-firebase-keys.sh my-custom-project-id
+```
+
+### Deploy Firestore security rules (required)
+
+Production mode blocks all access until rules are deployed:
+
+```bash
+npx -y firebase-tools@latest login
+npm run firebase:deploy:rules
 ```
 
 ---
