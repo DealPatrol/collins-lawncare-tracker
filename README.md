@@ -34,6 +34,19 @@ npm run ios:open    # open in Xcode
 - **Privacy policy template:** [docs/PRIVACY_POLICY.md](./docs/PRIVACY_POLICY.md) (host publicly before submitting)
 - **Source assets:** `resources/icon.png`, `resources/splash.png`
 
+## Firebase keys (cloud sync / auth)
+
+The app runs offline with localStorage today. To add Firebase (sync, auth, Firestore), see **[docs/KEYS.md](./docs/KEYS.md)**.
+
+Quick setup on your Mac:
+
+```bash
+npx -y firebase-tools@latest login
+npm run firebase:keys
+```
+
+This writes `.env` and `ios/App/App/GoogleService-Info.plist`.
+
 ## Built With
 - React + Vite
 - Capacitor (iOS native shell)
