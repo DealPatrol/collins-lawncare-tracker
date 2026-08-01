@@ -1,16 +1,20 @@
 rules_version = '2';
 
 // ===============================================================
-// Assumed Data Model
+// Assumed Data Model (v2)
 // ===============================================================
 //
 // Collection: users/{userId}/data
 // Document ID: app (only document allowed)
 // Fields:
-//   - jobs: list (required) — array of job objects, max 200 entries
-//   - workday: map | null (optional) — current workday state
-//   - homeAddress: string (optional) — max 500 characters
-//   - homeCoords: map | null (optional) — { lat: number, lng: number }
+//   - version: number (required) — must be 2
+//   - employees: list — crew roster, max 50
+//   - activeEmployeeId: string | null (optional)
+//   - jobs: list — max 200 entries
+//   - workdays: map — per-day per-employee workday records
+//   - prospects: list — max 500
+//   - expenses: list — max 1000
+//   - settings: map — app preferences (home, GPS, integrations)
 //   - updatedAt: timestamp (optional) — server write time
 //
 // ===============================================================
@@ -29,37 +33,25 @@ function isAppDoc(docId) {
   return docId == 'app';
 }
 
-function isValidCoords(coords) {
-  return coords == null
-    || (coords is map
-        && coords.keys().hasOnly(['lat', 'lng'])
-        && coords.lat is number
-        && coords.lng is number
-        && coords.lat >= -90 && coords.lat <= 90
-        && coords.lng >= -180 && coords.lng <= 180);
-}
-
-function isValidHomeAddress() {
-  return !('homeAddress' in request.resource.data)
-    || (request.resource.data.homeAddress is string
-        && request.resource.data.homeAddress.size() <= 500);
-}
-
-function isValidWorkday() {
-  return !('workday' in request.resource.data)
-    || request.resource.data.workday == null
-    || request.resource.data.workday is map;
-}
-
 function isValidAppData() {
   return request.resource.data.keys().hasOnly([
-      'jobs', 'workday', 'homeAddress', 'homeCoords', 'updatedAt'
+      'version', 'employees', 'activeEmployeeId', 'jobs', 'workdays',
+      'prospects', 'expenses', 'settings', 'updatedAt'
     ])
+    && request.resource.data.version == 2
+    && request.resource.data.employees is list
+    && request.resource.data.employees.size() <= 50
+    && (!('activeEmployeeId' in request.resource.data)
+        || request.resource.data.activeEmployeeId == null
+        || request.resource.data.activeEmployeeId is string)
     && request.resource.data.jobs is list
     && request.resource.data.jobs.size() <= 200
-    && isValidWorkday()
-    && isValidHomeAddress()
-    && isValidCoords(request.resource.data.get('homeCoords', null))
+    && request.resource.data.workdays is map
+    && request.resource.data.prospects is list
+    && request.resource.data.prospects.size() <= 500
+    && request.resource.data.expenses is list
+    && request.resource.data.expenses.size() <= 1000
+    && request.resource.data.settings is map
     && (!('updatedAt' in request.resource.data)
         || request.resource.data.updatedAt is timestamp);
 }

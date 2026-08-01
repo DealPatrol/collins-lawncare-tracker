@@ -1,16 +1,76 @@
 import { useEffect, useRef, useState } from "react";
 import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "./firebase.js";
+import { DEFAULT_SETTINGS } from "./store.js";
 
-function getTodayKey() {
-  return new Date().toISOString().split("T")[0];
+function normalizeRemoteState(data) {
+  if (!data || data.version !== 2) return null;
+  return {
+    version: 2,
+    employees: data.employees || [],
+    activeEmployeeId: data.activeEmployeeId ?? null,
+    jobs: data.jobs || [],
+    workdays: data.workdays || {},
+    prospects: data.prospects || [],
+    expenses: data.expenses || [],
+    settings: { ...DEFAULT_SETTINGS, ...data.settings },
+  };
+}
+
+/** Migrate a v1 cloud document (flat jobs/workday/home fields) into v2 state. */
+function migrateLegacyRemote(data) {
+  if (!Array.isArray(data?.jobs)) return null;
+  const workdays = {};
+  if (data.workday?.date && data.workday?.start) {
+    workdays[data.workday.date] = {
+      unassigned: {
+        start: data.workday.start,
+        end: data.workday.end ?? null,
+        startCoords: data.workday.startCoords ?? null,
+        endCoords: data.workday.endCoords ?? null,
+        stops: data.workday.stops || [],
+        distanceMeters: 0,
+      },
+    };
+  }
+  return {
+    version: 2,
+    employees: [],
+    activeEmployeeId: null,
+    jobs: data.jobs.map((j) => ({ radius: null, ...j })),
+    workdays,
+    prospects: [],
+    expenses: [],
+    settings: {
+      ...DEFAULT_SETTINGS,
+      homeAddress: data.homeAddress || "",
+      homeCoords: data.homeCoords ?? null,
+    },
+  };
+}
+
+function parseRemote(data) {
+  return normalizeRemoteState(data) ?? migrateLegacyRemote(data);
+}
+
+function serializeState(state) {
+  return {
+    version: state.version,
+    employees: state.employees,
+    activeEmployeeId: state.activeEmployeeId,
+    jobs: state.jobs,
+    workdays: state.workdays,
+    prospects: state.prospects || [],
+    expenses: state.expenses || [],
+    settings: state.settings,
+  };
 }
 
 /**
- * Syncs app data to Firestore when signed in.
- * Always falls back to localStorage (written by App.jsx) if cloud is unavailable.
+ * Syncs v2 app state to Firestore when signed in.
+ * localStorage (via saveState in App.jsx) remains the offline fallback.
  */
-export function useFirestoreSync(user, data, setters) {
+export function useFirestoreSync(user, state, setState) {
   const [syncing, setSyncing] = useState(false);
   const [syncError, setSyncError] = useState("");
   const [cloudActive, setCloudActive] = useState(false);
@@ -18,13 +78,10 @@ export function useFirestoreSync(user, data, setters) {
   const skipSave = useRef(true);
   const initialLocal = useRef(null);
 
-  const { jobs, workday, homeAddress, homeCoords } = data;
-  const { setJobs, setWorkday, setHomeAddress, setHomeCoords, restoreTimerState } = setters;
-
   useEffect(() => {
-    if (user) {
-      initialLocal.current = { jobs, workday, homeAddress, homeCoords };
-    }
+    if (user) initialLocal.current = serializeState(state);
+    // Capture local state once when the signed-in user changes.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.uid]);
 
   useEffect(() => {
@@ -44,11 +101,8 @@ export function useFirestoreSync(user, data, setters) {
       async (snapshot) => {
         try {
           if (!snapshot.exists()) {
-            const payload = initialLocal.current ?? { jobs, workday, homeAddress, homeCoords };
-            await setDoc(docRef, {
-              ...payload,
-              updatedAt: serverTimestamp(),
-            });
+            const payload = initialLocal.current ?? serializeState(state);
+            await setDoc(docRef, { ...payload, updatedAt: serverTimestamp() });
             remoteLoaded.current = true;
             skipSave.current = false;
             setCloudActive(true);
@@ -56,14 +110,9 @@ export function useFirestoreSync(user, data, setters) {
             return;
           }
 
-          const remote = snapshot.data();
+          const remote = parseRemote(snapshot.data());
           skipSave.current = true;
-          if (Array.isArray(remote.jobs)) setJobs(remote.jobs);
-          const remoteWorkday = remote.workday?.date === getTodayKey() ? remote.workday : null;
-          setWorkday(remoteWorkday);
-          if (remote.homeAddress != null) setHomeAddress(remote.homeAddress);
-          if (remote.homeCoords !== undefined) setHomeCoords(remote.homeCoords);
-          if (Array.isArray(remote.jobs)) restoreTimerState(remote.jobs);
+          if (remote) setState(remote);
           remoteLoaded.current = true;
           skipSave.current = false;
           setCloudActive(true);
@@ -84,7 +133,9 @@ export function useFirestoreSync(user, data, setters) {
     );
 
     return unsubscribe;
-  }, [user?.uid, setJobs, setWorkday, setHomeAddress, setHomeCoords, restoreTimerState]);
+    // Snapshot listener is tied to the signed-in user only.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid, setState]);
 
   useEffect(() => {
     if (!user || !db || !remoteLoaded.current) return;
@@ -96,7 +147,7 @@ export function useFirestoreSync(user, data, setters) {
         const docRef = doc(db, "users", user.uid, "data", "app");
         await setDoc(
           docRef,
-          { jobs, workday, homeAddress, homeCoords, updatedAt: serverTimestamp() },
+          { ...serializeState(state), updatedAt: serverTimestamp() },
           { merge: true }
         );
         setSyncError("");
@@ -110,7 +161,9 @@ export function useFirestoreSync(user, data, setters) {
     }, 600);
 
     return () => clearTimeout(timer);
-  }, [user?.uid, jobs, workday, homeAddress, homeCoords]);
+    // Debounced push of full app state while signed in.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.uid, state]);
 
   return { syncing, syncError, cloudActive };
 }
