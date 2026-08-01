@@ -4,7 +4,7 @@
 
 set -euo pipefail
 
-PROJECT_ID="${1:-collins-lawncare}"
+PROJECT_ID="${1:-lawncare-72560}"
 BUNDLE_ID="com.collins.lawncare"
 WEB_APP_NICKNAME="Collins Lawncare Web"
 

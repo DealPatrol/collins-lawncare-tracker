@@ -34,18 +34,40 @@ npm run ios:open    # open in Xcode
 - **Privacy policy template:** [docs/PRIVACY_POLICY.md](./docs/PRIVACY_POLICY.md) (host publicly before submitting)
 - **Source assets:** `resources/icon.png`, `resources/splash.png`
 
-## Firebase keys (cloud sync / auth)
+## Firebase (project: `lawncare-72560`)
 
-The app runs offline with localStorage today. To add Firebase (sync, auth, Firestore), see **[docs/KEYS.md](./docs/KEYS.md)**.
+Email/password auth and Firestore cloud sync are integrated. On first sign-in, local data migrates to `users/{uid}/data/app` in Firestore.
 
-Quick setup on your Mac:
+### 1. Add your web app keys
+
+```bash
+cp .env.example .env
+# Fill in VITE_FIREBASE_API_KEY, VITE_FIREBASE_MESSAGING_SENDER_ID, VITE_FIREBASE_APP_ID
+# from Firebase Console → Project Settings → Your apps → Web app
+```
+
+Or auto-fetch after `firebase login`:
+
+```bash
+npm run firebase:keys lawncare-72560
+```
+
+### 2. Deploy security rules (required — production mode blocks all reads/writes by default)
 
 ```bash
 npx -y firebase-tools@latest login
-npm run firebase:keys
+npm run firebase:deploy:rules
 ```
 
-This writes `.env` and `ios/App/App/GoogleService-Info.plist`.
+### 3. iOS config
+
+```bash
+npm run firebase:keys lawncare-72560
+```
+
+This also writes `ios/App/App/GoogleService-Info.plist`.
+
+See **[docs/KEYS.md](./docs/KEYS.md)** for details.
 
 ## Built With
 - React + Vite

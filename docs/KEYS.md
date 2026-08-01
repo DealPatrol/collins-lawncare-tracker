@@ -1,6 +1,14 @@
 # App Keys & Credentials Guide
 
-Collins Lawncare Tracker currently stores data locally. To add **cloud sync**, **login**, or **Firestore backup**, you need Firebase keys.
+Firebase project: **`lawncare-72560`**
+
+| App | Bundle / platform |
+|-----|-------------------|
+| Web | Registered in Firebase Console |
+| iOS | `com.collins.lawncare` |
+
+Firestore database: **production mode**, location **nam5**  
+Auth: **Email/Password** enabled
 
 ## Keys your app needs
 

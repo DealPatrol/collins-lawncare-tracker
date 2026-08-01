@@ -1,0 +1,57 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model
+// ===============================================================
+//
+// Collection: users/{userId}/data
+// Document: app
+// Fields:
+//   - jobs: list (required) - array of job objects
+//   - workday: map | null (optional) - current workday state
+//   - homeAddress: string (optional) - home address string
+//   - homeCoords: map | null (optional) - { lat: number, lng: number }
+//   - updatedAt: timestamp (optional) - server write time
+//
+// ===============================================================
+// Helper Functions
+// ===============================================================
+
+function isAuthenticated() {
+  return request.auth != null;
+}
+
+function isOwner(userId) {
+  return isAuthenticated() && request.auth.uid == userId;
+}
+
+function isValidAppData() {
+  return request.resource.data.keys().hasOnly([
+    'jobs', 'workday', 'homeAddress', 'homeCoords', 'updatedAt'
+  ])
+  && request.resource.data.jobs is list
+  && request.resource.data.jobs.size() <= 500
+  && (!('workday' in request.resource.data) || request.resource.data.workday == null || request.resource.data.workday is map)
+  && (!('homeAddress' in request.resource.data) || request.resource.data.homeAddress is string)
+  && (!('homeCoords' in request.resource.data) || request.resource.data.homeCoords == null || request.resource.data.homeCoords is map)
+  && (!('updatedAt' in request.resource.data) || request.resource.data.updatedAt is timestamp);
+}
+
+// ===============================================================
+// Security Rules
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/data/{docId} {
+      allow read: if isOwner(userId);
+      allow create: if isOwner(userId) && isValidAppData();
+      allow update: if isOwner(userId) && isValidAppData();
+      allow delete: if isOwner(userId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

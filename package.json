@@ -11,6 +11,7 @@
     "ios:sync": "cap sync ios",
     "assets:generate": "capacitor-assets generate --ios",
     "firebase:keys": "./scripts/fetch-firebase-keys.sh",
+    "firebase:deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules --project lawncare-72560",
     "lint": "eslint .",
     "preview": "vite preview"
   },

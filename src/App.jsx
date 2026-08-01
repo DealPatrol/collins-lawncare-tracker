@@ -1,5 +1,9 @@
-import { useState, useEffect, useRef } from "react";
+import { useState, useEffect, useRef, useCallback } from "react";
 import { getCurrentCoords } from "./location.js";
+import { useAuth } from "./useAuth.js";
+import Login from "./Login.jsx";
+import { useFirestoreSync } from "./useFirestoreSync.js";
+import { styles } from "./styles.js";
 
 const STORAGE_KEY = "collins_lawncare_jobs";
 const DAY_KEY = "collins_workday";
@@ -88,6 +92,24 @@ function buildMapBounds(jobs, homeCoords) {
 }
 
 export default function LawncareTracker() {
+  const { user, loading, login, signup, logout, firebaseEnabled } = useAuth();
+
+  if (firebaseEnabled && loading) {
+    return (
+      <div style={styles.page}>
+        <div style={{ textAlign: "center", padding: 48, color: "#94a3b8" }}>Loading…</div>
+      </div>
+    );
+  }
+
+  if (firebaseEnabled && !user) {
+    return <Login onLogin={login} onSignup={signup} />;
+  }
+
+  return <LawncareApp key={user?.uid ?? "local"} user={user} logout={logout} firebaseEnabled={firebaseEnabled} />;
+}
+
+function LawncareApp({ user, logout, firebaseEnabled }) {
   const [jobs, setJobs] = useState(loadJobs);
 
   const [workday, setWorkday] = useState(loadWorkday);
@@ -122,7 +144,25 @@ export default function LawncareTracker() {
   });
   const [geoError, setGeoError] = useState("");
 
-  // Persist jobs
+  const restoreTimerState = useCallback((jobList) => {
+    const running = getRunningJob(jobList);
+    setActiveTimer(running?.id ?? null);
+    setTimerStart(running?.currentSessionStart ?? null);
+    setElapsed(running?.currentSessionStart
+      ? Math.floor((Date.now() - running.currentSessionStart) / 1000)
+      : 0);
+    setLocStatus(running?.currentSessionLoc
+      ? `📍 ${running.currentSessionLoc.lat.toFixed(4)}, ${running.currentSessionLoc.lng.toFixed(4)}`
+      : "");
+  }, []);
+
+  const { syncing, syncError } = useFirestoreSync(
+    user,
+    { jobs, workday, homeAddress, homeCoords },
+    { setJobs, setWorkday, setHomeAddress, setHomeCoords, restoreTimerState }
+  );
+
+  // Persist jobs locally
   useEffect(() => {
     localStorage.setItem(STORAGE_KEY, JSON.stringify(jobs));
   }, [jobs]);
@@ -480,6 +520,21 @@ export default function LawncareTracker() {
           <h1 style={styles.headerTitle}>Settings</h1>
           <div style={{ width: 40 }} />
         </div>
+        {firebaseEnabled && user && (
+          <div style={styles.card}>
+            <div style={styles.sectionTitle}>Account</div>
+            <p style={{ color: "#94a3b8", fontSize: 13, marginBottom: 8 }}>{user.email}</p>
+            <p style={{ color: syncError ? "#f87171" : syncing ? "#facc15" : "#4ade80", fontSize: 12, marginBottom: 12 }}>
+              {syncError ? `⚠ ${syncError}` : syncing ? "☁ Syncing to cloud…" : "☁ Synced to Firestore"}
+            </p>
+            <button
+              style={{ ...styles.checkBtn, background: "#1e2a38", border: "1px solid #374151", width: "100%", marginBottom: 0 }}
+              onClick={() => logout()}
+            >
+              Sign Out
+            </button>
+          </div>
+        )}
         <div style={styles.card}>
           <div style={styles.sectionTitle}>Home Location</div>
           <label style={styles.label}>Home Address</label>
@@ -822,61 +877,3 @@ export default function LawncareTracker() {
   );
 }
 
-const styles = {
-  page: { background: "#0d1117", minHeight: "100vh", color: "#e2e8f0", fontFamily: "'Inter', system-ui, sans-serif", paddingBottom: "max(40px, env(safe-area-inset-bottom))" },
-  header: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "16px 16px 12px", borderBottom: "1px solid #1e2a38" },
-  brand: { fontSize: 17, fontWeight: 700, color: "#fff", letterSpacing: "-0.3px" },
-  subBrand: { fontSize: 10, color: "#64748b", marginTop: 1 },
-  headerTitle: { fontSize: 16, fontWeight: 600, color: "#fff", margin: 0 },
-  addBtn: { background: "#00d2ef", color: "#0d1117", border: "none", borderRadius: 8, padding: "7px 12px", fontWeight: 700, fontSize: 12, cursor: "pointer" },
-  iconBtn: { background: "none", border: "1px solid #1e2a38", borderRadius: 8, padding: "6px 10px", fontSize: 15, cursor: "pointer" },
-  backBtn: { background: "none", border: "none", color: "#00d2ef", fontSize: 14, cursor: "pointer", padding: 0 },
-  editBtn: { background: "none", border: "1px solid #374151", color: "#94a3b8", borderRadius: 6, padding: "5px 10px", fontSize: 12, cursor: "pointer" },
-  summaryRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8, padding: "10px 16px" },
-  summaryCard: { background: "#161b22", borderRadius: 10, padding: "10px 6px", textAlign: "center" },
-  summaryVal: { fontSize: 17, fontWeight: 700, color: "#00d2ef" },
-  summaryLbl: { fontSize: 9, color: "#64748b", marginTop: 3, lineHeight: 1.3 },
-  activeTimerBanner: { background: "#1c1200", border: "1px solid #854d0e", borderRadius: 8, margin: "0 16px 8px", padding: "10px 14px", color: "#fbbf24", fontSize: 13 },
-  jobList: { padding: "0 16px", display: "flex", flexDirection: "column", gap: 10 },
-  jobCard: { background: "#161b22", borderRadius: 10, padding: "13px 14px", display: "flex", justifyContent: "space-between", cursor: "pointer" },
-  jobCardLeft: { flex: 1 },
-  jobCardRight: { textAlign: "right", minWidth: 70 },
-  jobName: { fontWeight: 600, fontSize: 15, color: "#fff", marginBottom: 2 },
-  jobAddr: { fontSize: 11, color: "#64748b", marginBottom: 3 },
-  jobMeta: { fontSize: 12, color: "#94a3b8" },
-  jobPay: { fontWeight: 700, color: "#00d2ef", fontSize: 15 },
-  jobSessions: { fontSize: 11, color: "#64748b", marginTop: 3 },
-  emptyState: { textAlign: "center", padding: "50px 20px" },
-  card: { background: "#161b22", borderRadius: 12, padding: 16, margin: "0 16px 10px" },
-  label: { fontSize: 12, color: "#94a3b8", marginBottom: 5, display: "block", fontWeight: 500 },
-  input: { width: "100%", background: "#0d1117", border: "1px solid #2a2a2a", borderRadius: 8, color: "#e2e8f0", fontSize: 14, padding: "10px 12px", marginBottom: 12, boxSizing: "border-box", fontFamily: "inherit" },
-  primaryBtn: { width: "100%", background: "#00d2ef", color: "#0d1117", border: "none", borderRadius: 10, padding: "13px", fontWeight: 700, fontSize: 15, cursor: "pointer" },
-  address: { color: "#64748b", fontSize: 12, padding: "2px 16px 8px", margin: 0 },
-  statRow: { display: "grid", gridTemplateColumns: "1fr 1fr 1fr", gap: 8 },
-  stat: { textAlign: "center" },
-  statVal: { fontSize: 19, fontWeight: 700, color: "#fff" },
-  statLbl: { fontSize: 10, color: "#64748b", marginTop: 3 },
-  rateBar: { height: 6, background: "#1e2a38", borderRadius: 3, overflow: "hidden" },
-  rateBarFill: { height: "100%", borderRadius: 3, transition: "width 0.5s" },
-  rateHint: { fontSize: 12, color: "#94a3b8", marginTop: 6 },
-  rowBetween: { display: "flex", justifyContent: "space-between", alignItems: "center" },
-  checkBtn: { borderRadius: 8, padding: "8px 14px", fontSize: 13, cursor: "pointer", color: "#fff", fontWeight: 600 },
-  timerDisplay: { fontSize: 38, fontWeight: 700, color: "#00d2ef", fontVariantNumeric: "tabular-nums", marginBottom: 6 },
-  locText: { fontSize: 11, color: "#64748b", marginBottom: 12 },
-  startBtn: { width: "100%", background: "#14532d", border: "1px solid #4ade80", color: "#4ade80", borderRadius: 10, padding: 13, fontWeight: 700, fontSize: 15, cursor: "pointer" },
-  stopBtn: { background: "#7f1d1d", border: "1px solid #f87171", color: "#f87171", borderRadius: 10, padding: "12px 28px", fontWeight: 700, fontSize: 15, cursor: "pointer" },
-  sectionTitle: { fontWeight: 600, fontSize: 13, color: "#94a3b8", marginBottom: 10, textTransform: "uppercase", letterSpacing: "0.05em" },
-  empty: { color: "#4b5563", fontSize: 13, textAlign: "center", padding: "12px 0" },
-  sessionRow: { display: "flex", justifyContent: "space-between", alignItems: "center", padding: "10px 0", borderBottom: "1px solid #1e2a38" },
-  totalRow: { display: "flex", justifyContent: "space-between", paddingTop: 10, color: "#94a3b8", fontSize: 13, fontWeight: 600 },
-  deleteBtn: { display: "block", margin: "16px auto 0", background: "none", border: "1px solid #371111", color: "#f87171", borderRadius: 8, padding: "10px 24px", fontSize: 13, cursor: "pointer" },
-  dayStat: { background: "#0d1117", borderRadius: 8, padding: "8px 4px", textAlign: "center" },
-  dayStatVal: { fontSize: 16, fontWeight: 700, color: "#fff" },
-  dayStatLbl: { fontSize: 9, color: "#64748b", marginTop: 2 },
-  routeStop: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #1e2a38" },
-  routeDot: { width: 10, height: 10, borderRadius: "50%", background: "#00d2ef", flexShrink: 0 },
-  routeJobRow: { display: "flex", alignItems: "center", gap: 10, padding: "10px 0", borderBottom: "1px solid #1e2a38" },
-  routeNumBadge: { width: 26, height: 26, borderRadius: "50%", display: "flex", alignItems: "center", justifyContent: "center", fontSize: 12, fontWeight: 700, color: "#fff", flexShrink: 0 },
-  mapsBtn: { display: "block", background: "#1a2535", border: "1px solid #1e3a5f", color: "#60a5fa", borderRadius: 10, padding: "13px", fontWeight: 600, fontSize: 14, textAlign: "center", textDecoration: "none", marginBottom: 12 },
-  navBtn: { background: "none", border: "none", color: "#64748b", fontSize: 13, cursor: "pointer", padding: "4px 8px" },
-};
