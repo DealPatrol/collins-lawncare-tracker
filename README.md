@@ -39,7 +39,7 @@ npm run ios:open    # open in Xcode
 Email/password auth and Firestore cloud sync are integrated. Data syncs to `users/{uid}/data/app` when signed in, with **localStorage as an offline fallback**.
 
 ```bash
-cp .env.example .env   # keys are pre-filled for lawncare-72560
+npm run firebase:env   # writes .env from config/firebase/web.config.json
 npm run dev
 ```
 
