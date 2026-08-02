@@ -14,7 +14,8 @@
     "firebase:env": "node scripts/sync-firebase-env.js",
     "firebase:deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules --project lawncare-72560",
     "lint": "eslint .",
-    "preview": "vite preview"
+    "preview": "vite preview",
+    "firebase:check": "node check-firebase.js"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",
