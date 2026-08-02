@@ -1,5 +1,5 @@
 import { initializeApp } from 'firebase/app';
-import { getDatabase, ref, set, get, update, remove, onValue } from 'firebase/database';
+import { getDatabase, ref, set, get, onValue } from 'firebase/database';
 import { getAuth, signInAnonymously } from 'firebase/auth';
 
 // Firebase config loaded from environment variables

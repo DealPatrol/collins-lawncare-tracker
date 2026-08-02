@@ -16,7 +16,6 @@ console.log('\n🔍 Firebase Configuration Checker\n');
 
 // Check for .env.local
 const envLocalPath = path.join(__dirname, '.env.local');
-const envExamplePath = path.join(__dirname, '.env.firebase.example');
 
 if (!fs.existsSync(envLocalPath)) {
   console.log('❌ .env.local not found');
