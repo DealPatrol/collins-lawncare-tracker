@@ -136,6 +136,29 @@ export function optimizeRoute(origin, jobs) {
   return order.map((i) => routable[i]);
 }
 
+// Priority-aware routing: visit high-priority jobs first, then normal, then
+// low — but still travel-efficient *within* each tier via optimizeRoute,
+// continuing from wherever the previous tier left off. Jobs default to
+// "normal", so with no priorities set this produces the exact same order
+// as a single optimizeRoute call over everything.
+const PRIORITY_TIERS = ["high", "normal", "low"];
+
+export function smartRoute(origin, jobs) {
+  const byTier = { high: [], normal: [], low: [] };
+  jobs.forEach((j) => byTier[byTier[j.priority] ? j.priority : "normal"].push(j));
+
+  const order = [];
+  let cursor = origin;
+  for (const tier of PRIORITY_TIERS) {
+    const tierJobs = byTier[tier];
+    if (!tierJobs.length) continue;
+    const routed = optimizeRoute(cursor || tierJobs[0].coords, tierJobs);
+    order.push(...routed);
+    cursor = routed[routed.length - 1]?.coords || cursor;
+  }
+  return order;
+}
+
 // Straight-line distance scaled by a road-winding factor, at an average
 // rural driving speed — good enough for stop-by-stop ETAs without an API.
 const ROAD_FACTOR = 1.3;
@@ -171,6 +194,17 @@ export function getHourlyRate(job) {
 
 export function isMowedThisWeek(job) {
   return !!job.weeklyMows?.[getWeekKey()];
+}
+
+// ── Priority labels ──────────────────────────────────────────
+export const PRIORITY_META = {
+  high: { label: "High Priority", cls: "badge-red" },
+  normal: { label: "Normal", cls: "badge-dim" },
+  low: { label: "Low Priority", cls: "badge-dim" },
+};
+
+export function priorityMeta(priority) {
+  return PRIORITY_META[priority] || PRIORITY_META.normal;
 }
 
 export function rateColorClass(rate) {
