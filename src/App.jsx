@@ -4,7 +4,7 @@ import Login from "./Login.jsx";
 import { useFirestoreSync } from "./useFirestoreSync.js";
 import { styles } from "./styles.js";
 import {
-  loadState, saveState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect,
+  loadState, saveState, clearState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect,
   encodeCrewInvite, decodeCrewInvite, applyCrewInvite,
 } from "./store.js";
 import { makeExpense } from "./reports.js";
@@ -66,6 +66,14 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
   useEffect(() => saveState(state), [state]);
 
   const { syncing, syncError, cloudActive } = useFirestoreSync(user, state, setState);
+
+  // Clear locally cached app data before signing out so a different account
+  // signing in on this device does not inherit (or upload to its own cloud
+  // document) the previous user's private data.
+  const handleLogout = async () => {
+    clearState();
+    await logout();
+  };
 
   const me = state.employees.find((e) => e.id === state.activeEmployeeId) || null;
   const meId = me?.id;
@@ -416,7 +424,7 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
           syncing={syncing}
           syncError={syncError}
           cloudActive={cloudActive}
-          onLogout={logout}
+          onLogout={handleLogout}
           onUpdateSettings={updateSettings}
           onRestore={restoreState}
           onSwitchEmployee={switchEmployee}

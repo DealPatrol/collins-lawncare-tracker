@@ -91,6 +91,19 @@ export function saveState(state) {
   }
 }
 
+// Wipe all locally cached app data (current + legacy keys). Called on logout
+// so a different account signing in on this device can't inherit — or upload
+// to its own cloud document — the previous user's private data.
+export function clearState() {
+  [STATE_KEY, LEGACY_JOBS_KEY, LEGACY_DAY_KEY, LEGACY_HOME_KEY, LEGACY_HOME_COORDS_KEY].forEach((key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Ignore storage access errors — nothing else we can do here.
+    }
+  });
+}
+
 // ── Workday helpers ───────────────────────────────────────────
 // workdays: { [dayKey]: { [employeeId]: { start, end, stops, distanceMeters, ... } } }
 
