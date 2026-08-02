@@ -114,7 +114,11 @@ export function useFirestoreSync(user, state, setState) {
           skipSave.current = true;
           if (remote) setState(remote);
           remoteLoaded.current = true;
-          skipSave.current = false;
+          // Keep skipSave = true here. setState(remote) above schedules a
+          // re-render whose save effect must observe skipSave === true and
+          // bail out. Resetting the flag is done inside the save effect's
+          // early-return path so the remote-loaded state does not echo back
+          // to Firestore and cause an infinite write loop.
           setCloudActive(true);
           setSyncError("");
         } catch (err) {
@@ -139,7 +143,14 @@ export function useFirestoreSync(user, state, setState) {
 
   useEffect(() => {
     if (!user || !db || !remoteLoaded.current) return;
-    if (skipSave.current) return;
+    if (skipSave.current) {
+      // A remote snapshot just populated local state; consume the guard so
+      // this render's data isn't written back (which would re-trigger the
+      // listener and cause an infinite echo-write loop). Subsequent local
+      // edits will proceed to save normally.
+      skipSave.current = false;
+      return;
+    }
 
     setSyncing(true);
     const timer = setTimeout(async () => {
