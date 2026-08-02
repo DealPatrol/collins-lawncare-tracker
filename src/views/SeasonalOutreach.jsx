@@ -102,7 +102,7 @@ export default function SeasonalOpportunity({ jobs, senderName, bizPhone, onUpda
         This is what to offer them right now.
       </p>
       {campaigns.length > 1 && (
-        <div className="seg-control" style={{ marginBottom: 10, flexWrap: "wrap" }}>
+        <div className="seg-control" style={{ marginBottom: 10 }}>
           {campaigns.map((c) => (
             <button key={c.id} className={`seg-option${campaign.id === c.id ? " active" : ""}`} onClick={() => setCampaignId(c.id)}>
               {c.label}
