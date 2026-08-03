@@ -1,0 +1,87 @@
+{
+  "rules": {
+    "users": {
+      "$uid": {
+        // Only authenticated users can read/write their own data
+        ".read": "auth.uid === $uid",
+        ".write": "auth.uid === $uid",
+        
+        "state": {
+          ".validate": "newData.hasChildren(['settings', 'employees', 'jobs', 'workdays', 'prospects', 'expenses', 'version'])",
+          "settings": { ".validate": "newData.isObject()" },
+          "employees": { ".validate": "newData.isArray()" },
+          "jobs": { ".validate": "newData.isArray()" },
+          "workdays": { ".validate": "newData.isObject()" },
+          "prospects": { ".validate": "newData.isArray()" },
+          "expenses": { ".validate": "newData.isArray()" },
+          "version": { ".validate": "newData.isNumber()" }
+        },
+        
+        "lastSync": {
+          ".read": "auth.uid === $uid",
+          ".write": "auth.uid === $uid && newData.isNumber()",
+          ".validate": "newData.isNumber()"
+        }
+      }
+    },
+
+    "portalSessions": {
+      "$token": {
+        // Portal sessions are read-only and time-limited
+        ".read": "data.child('expiresAt').val() > now",
+        ".write": false,
+        
+        "jobId": { ".validate": "newData.isString()" },
+        "customerId": { ".validate": "newData.isString()" },
+        "issuedAt": { ".validate": "newData.isString()" },
+        "expiresAt": { ".validate": "newData.isString()" }
+      }
+    },
+
+    "paymentIntents": {
+      "$paymentId": {
+        // Payment records linked to specific jobs
+        ".read": "root.child('users').child(auth.uid).exists()",
+        ".write": "auth.uid !== null && newData.child('userId').val() === auth.uid",
+        
+        "userId": { ".validate": "newData.val() === auth.uid" },
+        "jobId": { ".validate": "newData.isString()" },
+        "amount": { ".validate": "newData.isNumber() && newData.val() > 0" },
+        "status": { ".validate": "newData.val() === 'pending' || newData.val() === 'succeeded' || newData.val() === 'failed'" },
+        "stripeId": { ".validate": "newData.isString()" },
+        "createdAt": { ".validate": "newData.isString()" }
+      }
+    },
+
+    "invoices": {
+      "$invoiceId": {
+        ".read": "root.child('users').child(auth.uid).exists() || root.child('portalSessions').child(query.orderByChild('jobId').equalTo($invoiceId)).exists()",
+        ".write": "auth.uid !== null && newData.child('userId').val() === auth.uid",
+        
+        "userId": { ".validate": "newData.val() === auth.uid" },
+        "jobId": { ".validate": "newData.isString()" },
+        "amount": { ".validate": "newData.isNumber() && newData.val() > 0" },
+        "status": { ".validate": "newData.val() === 'draft' || newData.val() === 'sent' || newData.val() === 'paid' || newData.val() === 'overdue'" },
+        "paidAt": { ".validate": "newData.isNull() || newData.isString()" },
+        "createdAt": { ".validate": "newData.isString()" }
+      }
+    },
+
+    "emailLogs": {
+      "$logId": {
+        ".read": "auth.uid !== null && root.child('users').child(auth.uid).exists()",
+        ".write": "auth.uid !== null && newData.child('userId').val() === auth.uid",
+        
+        "userId": { ".validate": "newData.val() === auth.uid" },
+        "jobId": { ".validate": "newData.isString()" },
+        "recipient": { ".validate": "newData.isString()" },
+        "type": { ".validate": "newData.val() === 'invoice' || newData.val() === 'confirmation' || newData.val() === 'reminder'" },
+        "sentAt": { ".validate": "newData.isString()" },
+        "status": { ".validate": "newData.val() === 'sent' || newData.val() === 'failed' || newData.val() === 'bounced'" }
+      }
+    },
+
+    ".read": false,
+    ".write": false
+  }
+}
