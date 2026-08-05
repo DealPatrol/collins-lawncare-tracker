@@ -8,13 +8,14 @@ import { buildCompletionMessage, sendCompletionWebhook } from "./notify.js";
 import { getTodayKey, getWeekKey } from "./utils.js";
 import { getCurrentCoords } from "./location.js";
 import { useGpsTracking } from "./useGpsTracking.js";
-import { IconHome, IconLeaf, IconMap, IconUsers, IconGear } from "./icons.jsx";
+import { IconHome, IconLeaf, IconMap, IconUsers, IconTarget, IconGear } from "./icons.jsx";
 import TodayView from "./views/TodayView.jsx";
 import JobsView from "./views/JobsView.jsx";
 import JobDetail from "./views/JobDetail.jsx";
 import JobForm from "./views/JobForm.jsx";
 import RouteView from "./views/RouteView.jsx";
 import CrewView from "./views/CrewView.jsx";
+import PropertyHunter from "./views/PropertyHunter.jsx";
 import SettingsView from "./views/SettingsView.jsx";
 import Onboarding from "./views/Onboarding.jsx";
 
@@ -22,6 +23,7 @@ const TABS = [
   { id: "today", label: "Today", Icon: IconHome },
   { id: "jobs", label: "Jobs", Icon: IconLeaf },
   { id: "route", label: "Route", Icon: IconMap },
+  { id: "hunter", label: "Hunter", Icon: IconTarget },
   { id: "crew", label: "Crew", Icon: IconUsers },
   { id: "settings", label: "Settings", Icon: IconGear },
 ];
@@ -378,6 +380,7 @@ export default function App() {
     }
     if (tab === "jobs") return <JobsView {...shared} />;
     if (tab === "route") return <RouteView {...shared} />;
+    if (tab === "hunter") return <PropertyHunter state={state} setState={setState} regrindToken={state.settings.regrindToken} />;
     if (tab === "crew") return <CrewView {...shared} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onSwitchEmployee={switchEmployee} onJoinCrew={joinCrew} getInviteCode={() => encodeCrewInvite(state)} />;
     if (tab === "settings") {
       return <SettingsView {...shared} onUpdateSettings={updateSettings} onRestore={restoreState} onSwitchEmployee={switchEmployee} />;

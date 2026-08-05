@@ -43,6 +43,7 @@ export default function SettingsView({
   const importRef = useRef(null);
   const [homeAddress, setHomeAddress] = useState(settings.homeAddress);
   const [regridToken, setRegridToken] = useState(settings.regridToken || "");
+  const [regrindToken, setRegrindToken] = useState(settings.regrindToken || "");
   const [bizPhone, setBizPhone] = useState(settings.bizPhone || "");
   const [webhookUrl, setWebhookUrl] = useState(settings.notifyWebhookUrl || "");
   const [msgTemplate, setMsgTemplate] = useState(settings.notifyMessageTemplate || "");
@@ -217,6 +218,12 @@ export default function SettingsView({
             value={regridToken} onChange={(e) => setRegridToken(e.target.value)}
             autoCapitalize="none" autoCorrect="off" spellCheck={false}
           />
+          <label className="field-label">Regrind JWT token (Property Hunter)</label>
+          <input
+            className="input" placeholder="Paste your Regrind JWT token"
+            value={regrindToken} onChange={(e) => setRegrindToken(e.target.value)}
+            autoCapitalize="none" autoCorrect="off" spellCheck={false}
+          />
           <label className="field-label">Business callback number (goes in your messages)</label>
           <input
             className="input" type="tel" placeholder="(256) 555-0123"
@@ -224,7 +231,7 @@ export default function SettingsView({
           />
           <button
             className="btn btn-ghost btn-block"
-            onClick={() => { onUpdateSettings({ regridToken: regridToken.trim(), bizPhone: bizPhone.trim() }); showToast("Prospector settings saved."); }}
+            onClick={() => { onUpdateSettings({ regridToken: regridToken.trim(), regrindToken: regrindToken.trim(), bizPhone: bizPhone.trim() }); showToast("Prospector settings saved."); }}
           >
             Save Prospector Settings
           </button>
