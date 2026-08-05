@@ -270,7 +270,10 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
       if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
       showToast("Left the job site — timer stopped and visit saved automatically.");
     }
-    if (jobBefore?.notifyOnComplete && jobBefore?.customerPhone && state.settings.notifyWebhookUrl) {
+    // Only text the customer if a session was actually running and stopped —
+    // without this, a stray/duplicate stopTimer call on an idle job would
+    // send a false "we finished" text to a real person.
+    if (jobBefore?.currentSessionStart && jobBefore?.notifyOnComplete && jobBefore?.customerPhone && state.settings.notifyWebhookUrl) {
       const empId = jobBefore.currentSessionEmployeeId || meId;
       const crewName = state.employees.find((e) => e.id === empId)?.name || me?.name;
       sendCompletionWebhook(state.settings.notifyWebhookUrl, {

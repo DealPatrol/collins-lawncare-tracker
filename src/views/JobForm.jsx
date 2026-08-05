@@ -18,6 +18,7 @@ export default function JobForm({ job, prefill, settings, onSave, onBack }) {
     customerName: src?.customerName || "",
     customerPhone: src?.customerPhone || "",
     notifyOnComplete: src?.notifyOnComplete || false,
+    priority: src?.priority || "normal",
   });
   const [geoStatus, setGeoStatus] = useState("");
 
@@ -55,6 +56,7 @@ export default function JobForm({ job, prefill, settings, onSave, onBack }) {
       customerName: form.customerName.trim(),
       customerPhone: form.customerPhone.trim(),
       notifyOnComplete: form.notifyOnComplete,
+      priority: form.priority,
     });
   };
 
@@ -102,6 +104,32 @@ export default function JobForm({ job, prefill, settings, onSave, onBack }) {
 
           <label className="field-label">Notes</label>
           <textarea className="input" style={{ height: 76, resize: "vertical" }} placeholder="Gate code, dog, trimming, where to park…" value={form.notes} onChange={set("notes")} />
+
+          <label className="field-label">Priority</label>
+          <div className="seg-control">
+            <button
+              className={`seg-option${form.priority === "low" ? " active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, priority: "low" }))}
+            >
+              Low
+            </button>
+            <button
+              className={`seg-option${form.priority === "normal" ? " active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, priority: "normal" }))}
+            >
+              Normal
+            </button>
+            <button
+              className={`seg-option${form.priority === "high" ? " active" : ""}`}
+              onClick={() => setForm((f) => ({ ...f, priority: "high" }))}
+            >
+              High
+            </button>
+          </div>
+          <p className="text-faint" style={{ fontSize: 11.5, marginTop: 8, lineHeight: 1.5 }}>
+            High-priority yards get routed first in Route Planner &amp; Today&apos;s &quot;Next up&quot; pick;
+            low-priority ones get pushed to the end of the day.
+          </p>
         </div>
 
         <div className="card">

@@ -25,9 +25,12 @@
     "@capacitor/ios": "^8.4.1",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
+    "@sendgrid/mail": "^8.1.6",
+    "@stripe/stripe-js": "^9.12.1",
     "firebase": "^12.17.0",
     "react": "^19.2.6",
-    "react-dom": "^19.2.6"
+    "react-dom": "^19.2.6",
+    "stripe": "^22.4.0"
   },
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",

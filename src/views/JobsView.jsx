@@ -1,6 +1,6 @@
 import { useMemo, useState } from "react";
 import {
-  formatDuration, formatMoney, getAvgTime, getHourlyRate, isMowedThisWeek, rateColorClass,
+  formatDuration, formatMoney, getAvgTime, getHourlyRate, isMowedThisWeek, priorityMeta, rateColorClass,
 } from "../utils.js";
 import { IconLeaf, IconPlus, IconPin, IconCheck, IconClock } from "../icons.jsx";
 
@@ -72,7 +72,14 @@ export default function JobsView({ state, activeJob, openJob, onAddJob }) {
           return (
             <div key={j.id} className={`job-card ${running ? "running" : mowed ? "done" : "pending"}`} onClick={() => openJob(j.id)}>
               <div style={{ flex: 1, minWidth: 0 }}>
-                <div className="job-name">{j.name}</div>
+                <div className="job-name">
+                  {j.name}
+                  {j.priority && j.priority !== "normal" && (
+                    <span className={`badge ${priorityMeta(j.priority).cls}`} style={{ marginLeft: 8, fontSize: 10, verticalAlign: 2 }}>
+                      {j.priority === "high" ? "High" : "Low"}
+                    </span>
+                  )}
+                </div>
                 {j.address && <div className="job-addr">{j.address}</div>}
                 <div className="job-meta">
                   {running ? (

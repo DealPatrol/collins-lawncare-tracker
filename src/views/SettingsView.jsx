@@ -334,7 +334,7 @@ export default function SettingsView({
             </div>
           </div>
           <label className="field-label">Category</label>
-          <div className="seg-control" style={{ flexWrap: "wrap" }}>
+          <div className="seg-control" style={{ gridTemplateColumns: "1fr 1fr 1fr" }}>
             {EXPENSE_CATEGORIES.map((c) => (
               <button key={c} className={`seg-option${expForm.category === c ? " active" : ""}`} onClick={() => setExpForm((f) => ({ ...f, category: c }))}>
                 {c}
@@ -343,7 +343,7 @@ export default function SettingsView({
           </div>
           <label className="field-label">Note (optional)</label>
           <input className="input" placeholder="e.g. Gas at Shell" value={expForm.note} onChange={(e) => setExpForm((f) => ({ ...f, note: e.target.value }))} />
-          <button className="btn btn-primary btn-block" disabled={!expForm.amount} onClick={saveExpense}>
+          <button className="btn btn-primary btn-block" disabled={!(parseFloat(expForm.amount) > 0)} onClick={saveExpense}>
             <IconPlus size={15} />Log Expense
           </button>
           {recentExpenses.length > 0 && (
