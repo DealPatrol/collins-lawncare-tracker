@@ -1,53 +1,44 @@
-import { useState } from 'react';
-import { verifyPortalToken, formatJobForPortal, generateInvoiceLink } from '../portal';
-
-function loadPortalState() {
-  const params = new URLSearchParams(window.location.search);
-  const urlToken = params.get('token');
-
-  if (!urlToken) {
-    return {
-      token: null,
-      job: null,
-      error: 'Invalid access link. Please check the URL.',
-      loading: false,
-    };
-  }
-
-  const verified = verifyPortalToken(urlToken);
-  if (!verified) {
-    return {
-      token: null,
-      job: null,
-      error: 'This link has expired. Please request a new one from your service provider.',
-      loading: false,
-    };
-  }
-
-  // TODO: Load job from Firebase using verified.jobId
-  const mockJob = {
-    id: verified.jobId,
-    name: 'Lawn Maintenance - Spring Service',
-    address: '123 Main St, Nashville, TN',
-    status: 'completed',
-    pay: 150,
-    photos: [],
-    notes: 'Service completed successfully',
-    payments: [],
-    startTime: '2024-03-15T09:00:00',
-    endTime: '2024-03-15T10:30:00',
-  };
-
-  return {
-    token: verified,
-    job: formatJobForPortal(mockJob),
-    error: null,
-    loading: false,
-  };
-}
+import { useEffect, useState } from 'react';
+import { fetchPortalJob, formatJobForPortal, generateInvoiceLink } from '../portal.js';
 
 export default function ClientPortal() {
-  const [{ job, error, loading }] = useState(loadPortalState);
+  const [job, setJob] = useState(null);
+  const [error, setError] = useState(null);
+  const [loading, setLoading] = useState(true);
+
+  useEffect(() => {
+    let cancelled = false;
+    const params = new URLSearchParams(window.location.search);
+    const token = params.get('token');
+
+    async function load() {
+      if (!token) {
+        if (!cancelled) {
+          setError('Invalid access link. Please check the URL.');
+          setLoading(false);
+        }
+        return;
+      }
+
+      try {
+        const remote = await fetchPortalJob(token);
+        if (!cancelled) {
+          setJob(formatJobForPortal(remote));
+          setError(null);
+        }
+      } catch (err) {
+        if (!cancelled) {
+          setError(err?.message || 'Could not load job details.');
+          setJob(null);
+        }
+      } finally {
+        if (!cancelled) setLoading(false);
+      }
+    }
+
+    load();
+    return () => { cancelled = true; };
+  }, []);
 
   if (loading) {
     return (
@@ -79,19 +70,19 @@ export default function ClientPortal() {
     );
   }
 
+  const portalToken = new URLSearchParams(window.location.search).get('token');
+
   return (
     <div style={portalStyles.container}>
-      {/* Header */}
       <div style={portalStyles.header}>
         <h1 style={portalStyles.title}>Job Details</h1>
         <div style={portalStyles.badge}>{job.status.toUpperCase()}</div>
       </div>
 
-      {/* Job Info Card */}
       <div style={portalStyles.card}>
         <div style={portalStyles.jobName}>{job.name}</div>
         <div style={portalStyles.address}>{job.address}</div>
-        
+
         <div style={portalStyles.grid}>
           <div style={portalStyles.gridItem}>
             <div style={portalStyles.label}>Service Date</div>
@@ -117,7 +108,6 @@ export default function ClientPortal() {
         )}
       </div>
 
-      {/* Photos Gallery */}
       {job.photos && job.photos.length > 0 && (
         <div style={portalStyles.card}>
           <div style={portalStyles.sectionTitle}>Before & After</div>
@@ -129,7 +119,6 @@ export default function ClientPortal() {
         </div>
       )}
 
-      {/* Invoice & Payment */}
       <div style={portalStyles.card}>
         <div style={portalStyles.sectionTitle}>Invoice</div>
         <div style={portalStyles.invoiceRow}>
@@ -142,7 +131,7 @@ export default function ClientPortal() {
             <div style={{ fontSize: 12, color: '#22c55e', marginTop: 8, fontWeight: 600 }}>
               Paid in full
             </div>
-            {job.payments.map(p => (
+            {job.payments.map((p) => (
               <div key={p.id} style={portalStyles.paymentItem}>
                 <div style={{ fontSize: 12, color: '#64748b' }}>{new Date(p.date).toLocaleDateString()}</div>
                 <div style={{ fontWeight: 600, color: '#22c55e' }}>${p.amount.toFixed(2)}</div>
@@ -150,13 +139,19 @@ export default function ClientPortal() {
             ))}
           </div>
         ) : (
-          <button style={portalStyles.payButton} onClick={() => window.location.href = generateInvoiceLink(window.location.origin, window.location.search.split('token=')[1])}>
+          <button
+            style={portalStyles.payButton}
+            onClick={() => {
+              if (portalToken) {
+                window.location.href = generateInvoiceLink(window.location.origin, portalToken);
+              }
+            }}
+          >
             Pay Invoice
           </button>
         )}
       </div>
 
-      {/* Footer */}
       <div style={portalStyles.footer}>
         <p style={{ color: '#94a3b8', fontSize: 12 }}>
           Questions? Contact us for support.

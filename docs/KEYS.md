@@ -10,11 +10,16 @@ Firebase project: **`lawncare-72560`**
 Firestore database: **production mode**, location **nam5**  
 Auth: **Email/Password** enabled
 
+**Architecture overview:** [FIREBASE.md](./FIREBASE.md)
+
 ## Keys your app needs
 
 | Key / file | Used for | Required today? |
 |------------|----------|---------------|
-| `VITE_FIREBASE_*` env vars | Web app Firebase SDK | Only if adding Firebase |
+| `VITE_FIREBASE_*` env vars | Web app Firebase SDK | Yes (auth + sync) |
+| `PORTAL_TOKEN_SECRET` | Sign customer portal links (server) | For client portal |
+| `FIREBASE_SERVICE_ACCOUNT` | Server reads Firestore for portal API | For client portal |
+| `VITE_API_BASE_URL` | API host for Capacitor / split deploy | When API is not same origin |
 | `GoogleService-Info.plist` | Native iOS Firebase SDK | Only if adding Firebase to iOS |
 | Apple Developer account | App Store signing | For App Store only |
 | Google Maps API key | Embedded maps | **Not required** — app uses free Google Maps links |
@@ -122,4 +127,5 @@ import.meta.env.VITE_FIREBASE_PROJECT_ID  // should show your project ID
 
 - **Never commit** `.env` or `GoogleService-Info.plist` with real keys to a public repo
 - Firebase web `apiKey` is not a secret (it's restricted by domain/bundle ID in Firebase Console)
-- Enable **Firestore security rules** before going to production — see `firebase-firestore` skill
+- Enable **Firestore security rules** before going to production — see [FIRESTORE_RULES_AUDIT.md](./FIRESTORE_RULES_AUDIT.md)
+- **Never commit** `FIREBASE_SERVICE_ACCOUNT` or `PORTAL_TOKEN_SECRET` to git

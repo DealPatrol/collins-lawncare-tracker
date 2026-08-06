@@ -65,6 +65,14 @@ npx -y firebase-tools@latest login
 npm run firebase:deploy:rules
 ```
 
+Deploy Firestore security rules (required for production mode):
+
+```bash
+npx -y firebase-tools@latest login
+npm run firebase:deploy:rules
+```
+
+- **Firebase architecture:** [docs/FIREBASE.md](./docs/FIREBASE.md)
 - **Security rules audit:** [docs/FIRESTORE_RULES_AUDIT.md](./docs/FIRESTORE_RULES_AUDIT.md)
 - **iOS native Firebase (stubbed):** [docs/IOS_FIREBASE.md](./docs/IOS_FIREBASE.md)
 
