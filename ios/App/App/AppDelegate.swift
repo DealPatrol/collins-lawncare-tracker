@@ -7,7 +7,10 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     var window: UIWindow?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
-        // Override point for customization after application launch.
+        // Native Firebase (optional): after adding GoogleService-Info.plist and the Firebase iOS SDK,
+        // uncomment the lines below. See docs/IOS_FIREBASE.md.
+        // import FirebaseCore
+        // FirebaseApp.configure()
         return true
     }
 

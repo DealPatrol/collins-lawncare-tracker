@@ -17,6 +17,7 @@ export default function JobForm({ job, prefill, settings, onSave, onBack }) {
     radius: src?.radius ?? "",
     customerName: src?.customerName || "",
     customerPhone: src?.customerPhone || "",
+    customerEmail: src?.customerEmail || "",
     notifyOnComplete: src?.notifyOnComplete || false,
     priority: src?.priority || "normal",
   });
@@ -55,6 +56,7 @@ export default function JobForm({ job, prefill, settings, onSave, onBack }) {
       radius: !isNaN(radius) && radius > 0 ? radius : null,
       customerName: form.customerName.trim(),
       customerPhone: form.customerPhone.trim(),
+      customerEmail: form.customerEmail.trim(),
       notifyOnComplete: form.notifyOnComplete,
       priority: form.priority,
     });
@@ -138,6 +140,8 @@ export default function JobForm({ job, prefill, settings, onSave, onBack }) {
           <input className="input" placeholder="e.g. Sarah Smith" value={form.customerName} onChange={set("customerName")} />
           <label className="field-label">Customer phone (optional)</label>
           <input className="input" type="tel" placeholder="(256) 555-0123" value={form.customerPhone} onChange={set("customerPhone")} />
+          <label className="field-label">Customer email (portal &amp; invoices, optional)</label>
+          <input className="input" type="email" placeholder="customer@example.com" value={form.customerEmail} onChange={set("customerEmail")} />
           <label className="field-label">Text them when the job&apos;s done</label>
           <div className="seg-control">
             <button

@@ -1,4 +1,7 @@
 import { useState } from "react";
+import { useAuth } from "../useAuth.js";
+import { getFirebaseAuth } from "../firebase.js";
+import { createPortalLink } from "../portal.js";
 import {
   formatClock, formatDuration, formatMoney, getAvgTime, getHourlyRate,
   getTotalTime, isMowedThisWeek, priorityMeta, rateColorClass,
@@ -10,10 +13,12 @@ import {
 
 export default function JobDetail({
   state, me, job, activeJob, now, startTimer, stopTimer, toggleMow,
-  onEdit, onDelete, onBack,
+  onEdit, onDelete, onBack, showToast,
 }) {
   const { settings } = state;
+  const { user, firebaseEnabled } = useAuth();
   const [confirmDelete, setConfirmDelete] = useState(false);
+  const [portalBusy, setPortalBusy] = useState(false);
 
   const rate = getHourlyRate(job);
   const avgSec = getAvgTime(job);
@@ -28,6 +33,33 @@ export default function JobDetail({
   const mapsUrl = job.address || job.coords
     ? `https://www.google.com/maps/search/?api=1&query=${encodeURIComponent(job.address || `${job.coords.lat},${job.coords.lng}`)}`
     : null;
+
+  const sharePortalLink = async () => {
+    if (!firebaseEnabled || !user) {
+      showToast?.("Sign in to share a customer portal link.", "amber");
+      return;
+    }
+    setPortalBusy(true);
+    try {
+      const idToken = await getFirebaseAuth().currentUser.getIdToken();
+      const { url } = await createPortalLink({
+        jobId: job.id,
+        customerEmail: job.customerEmail || null,
+        idToken,
+      });
+      if (navigator.clipboard?.writeText) {
+        await navigator.clipboard.writeText(url);
+        showToast?.("Portal link copied to clipboard.");
+      } else {
+        showToast?.("Portal link created — copy from the browser address bar after opening.");
+        window.prompt("Customer portal link:", url);
+      }
+    } catch (err) {
+      showToast?.(err?.message || "Could not create portal link.", "red");
+    } finally {
+      setPortalBusy(false);
+    }
+  };
 
   return (
     <>
@@ -122,6 +154,18 @@ export default function JobDetail({
             </button>
           </div>
         </div>
+
+        {firebaseEnabled && user && (
+          <div className="card">
+            <div className="section-title">Customer Portal</div>
+            <p className="text-dim" style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
+              Share a secure link so the customer can view job details and pay their invoice.
+            </p>
+            <button className="btn btn-ghost btn-block" disabled={portalBusy} onClick={sharePortalLink}>
+              {portalBusy ? "Creating link…" : "Copy Portal Link"}
+            </button>
+          </div>
+        )}
 
         {job.notes && (
           <div className="card card-tight">

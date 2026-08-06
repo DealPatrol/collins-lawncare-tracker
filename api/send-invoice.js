@@ -7,7 +7,7 @@ export default async function handler(req, res) {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const { jobId, customerEmail, jobName, amount, address, portalLink } = req.body;
+  const { customerEmail, jobName, amount, address, portalLink } = req.body;
 
   // Validate input
   if (!customerEmail || !jobName || !amount) {
@@ -43,9 +43,11 @@ export default async function handler(req, res) {
           </div>
           
           <div style="text-align: center; margin: 24px 0;">
-            <a href="${portalLink}" style="background: #22c55e; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 700; display: inline-block;">
+            ${portalLink
+    ? `<a href="${portalLink}" style="background: #22c55e; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 700; display: inline-block;">
               View Job & Pay Invoice
-            </a>
+            </a>`
+    : `<p style="color: #64748b; font-size: 14px;">Contact Collins Lawncare to view your invoice and pay online.</p>`}
           </div>
         </div>
         

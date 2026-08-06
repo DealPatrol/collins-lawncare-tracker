@@ -1,6 +1,10 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { useAuth } from "./useAuth.js";
+import Login from "./Login.jsx";
+import { useFirestoreSync } from "./useFirestoreSync.js";
+import { styles } from "./styles.js";
 import {
-  loadState, saveState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect,
+  loadState, saveState, clearState, getWorkday, setWorkday, pruneWorkdays, makeEmployee, makeProspect,
   encodeCrewInvite, decodeCrewInvite, applyCrewInvite,
 } from "./store.js";
 import { makeExpense } from "./reports.js";
@@ -27,6 +31,31 @@ const TABS = [
 ];
 
 export default function App() {
+  const { user, loading, login, signup, logout, firebaseEnabled } = useAuth();
+
+  if (firebaseEnabled && loading) {
+    return (
+      <div style={styles.page}>
+        <div style={{ textAlign: "center", padding: 48, color: "#94a3b8" }}>Loading…</div>
+      </div>
+    );
+  }
+
+  if (firebaseEnabled && !user) {
+    return <Login onLogin={login} onSignup={signup} />;
+  }
+
+  return (
+    <LawncareApp
+      key={user?.uid ?? "local"}
+      user={user}
+      logout={logout}
+      firebaseEnabled={firebaseEnabled}
+    />
+  );
+}
+
+function LawncareApp({ user, logout, firebaseEnabled }) {
   const [state, setState] = useState(loadState);
   const [tab, setTab] = useState("today");
   // subview: null | { kind: "detail", jobId } | { kind: "form", jobId? }
@@ -35,6 +64,16 @@ export default function App() {
   const [now, setNow] = useState(0); // shared wall clock, ticks while anything runs
 
   useEffect(() => saveState(state), [state]);
+
+  const { syncing, syncError, cloudActive } = useFirestoreSync(user, state, setState);
+
+  // Clear locally cached app data before signing out so a different account
+  // signing in on this device does not inherit (or upload to its own cloud
+  // document) the previous user's private data.
+  const handleLogout = async () => {
+    clearState();
+    await logout();
+  };
 
   const me = state.employees.find((e) => e.id === state.activeEmployeeId) || null;
   const meId = me?.id;
@@ -380,7 +419,20 @@ export default function App() {
     if (tab === "route") return <RouteView {...shared} />;
     if (tab === "crew") return <CrewView {...shared} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onSwitchEmployee={switchEmployee} onJoinCrew={joinCrew} getInviteCode={() => encodeCrewInvite(state)} />;
     if (tab === "settings") {
-      return <SettingsView {...shared} onUpdateSettings={updateSettings} onRestore={restoreState} onSwitchEmployee={switchEmployee} />;
+      return (
+        <SettingsView
+          {...shared}
+          firebaseEnabled={firebaseEnabled}
+          user={user}
+          syncing={syncing}
+          syncError={syncError}
+          cloudActive={cloudActive}
+          onLogout={handleLogout}
+          onUpdateSettings={updateSettings}
+          onRestore={restoreState}
+          onSwitchEmployee={switchEmployee}
+        />
+      );
     }
     return <TodayView {...shared} onGoRoute={() => setTab("route")} />;
   };

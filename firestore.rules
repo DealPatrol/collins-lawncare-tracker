@@ -1,0 +1,76 @@
+rules_version = '2';
+
+// ===============================================================
+// Assumed Data Model (v2)
+// ===============================================================
+//
+// Collection: users/{userId}/data
+// Document ID: app (only document allowed)
+// Fields:
+//   - version: number (required) — must be 2
+//   - employees: list — crew roster, max 50
+//   - activeEmployeeId: string | null (optional)
+//   - jobs: list — max 200 entries
+//   - workdays: map — per-day per-employee workday records
+//   - prospects: list — max 500
+//   - expenses: list — max 1000
+//   - settings: map — app preferences (home, GPS, integrations)
+//   - updatedAt: timestamp (optional) — server write time
+//
+// ===============================================================
+// Helper Functions
+// ===============================================================
+
+function isAuthenticated() {
+  return request.auth != null;
+}
+
+function isOwner(userId) {
+  return isAuthenticated() && request.auth.uid == userId;
+}
+
+function isAppDoc(docId) {
+  return docId == 'app';
+}
+
+function isValidAppData() {
+  return request.resource.data.keys().hasOnly([
+      'version', 'employees', 'activeEmployeeId', 'jobs', 'workdays',
+      'prospects', 'expenses', 'settings', 'updatedAt'
+    ])
+    && request.resource.data.version == 2
+    && request.resource.data.employees is list
+    && request.resource.data.employees.size() <= 50
+    && (!('activeEmployeeId' in request.resource.data)
+        || request.resource.data.activeEmployeeId == null
+        || request.resource.data.activeEmployeeId is string)
+    && request.resource.data.jobs is list
+    && request.resource.data.jobs.size() <= 200
+    && request.resource.data.workdays is map
+    && request.resource.data.prospects is list
+    && request.resource.data.prospects.size() <= 500
+    && request.resource.data.expenses is list
+    && request.resource.data.expenses.size() <= 1000
+    && request.resource.data.settings is map
+    && (!('updatedAt' in request.resource.data)
+        || request.resource.data.updatedAt is timestamp);
+}
+
+// ===============================================================
+// Security Rules
+// ===============================================================
+
+service cloud.firestore {
+  match /databases/{database}/documents {
+    match /users/{userId}/data/{docId} {
+      allow read: if isOwner(userId) && isAppDoc(docId);
+      allow create: if isOwner(userId) && isAppDoc(docId) && isValidAppData();
+      allow update: if isOwner(userId) && isAppDoc(docId) && isValidAppData();
+      allow delete: if isOwner(userId) && isAppDoc(docId);
+    }
+
+    match /{document=**} {
+      allow read, write: if false;
+    }
+  }
+}

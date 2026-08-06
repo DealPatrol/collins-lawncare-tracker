@@ -49,6 +49,33 @@ npm run ios:open    # open in Xcode
 - **Privacy policy template:** [docs/PRIVACY_POLICY.md](./docs/PRIVACY_POLICY.md) (host publicly before submitting)
 - **Source assets:** `resources/icon.png`, `resources/splash.png`
 
+## Firebase (project: `lawncare-72560`)
+
+Email/password auth and Firestore cloud sync are integrated. Data syncs to `users/{uid}/data/app` when signed in, with **localStorage as an offline fallback**.
+
+```bash
+npm run firebase:env   # writes .env from config/firebase/web.config.json
+npm run dev
+```
+
+Deploy Firestore security rules (required for production mode):
+
+```bash
+npx -y firebase-tools@latest login
+npm run firebase:deploy:rules
+```
+
+Deploy Firestore security rules (required for production mode):
+
+```bash
+npx -y firebase-tools@latest login
+npm run firebase:deploy:rules
+```
+
+- **Firebase architecture:** [docs/FIREBASE.md](./docs/FIREBASE.md)
+- **Security rules audit:** [docs/FIRESTORE_RULES_AUDIT.md](./docs/FIRESTORE_RULES_AUDIT.md)
+- **iOS native Firebase (stubbed):** [docs/IOS_FIREBASE.md](./docs/IOS_FIREBASE.md)
+
 ## Built With
 - React + Vite
 - Capacitor (iOS native shell)
