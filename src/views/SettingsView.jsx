@@ -38,6 +38,7 @@ function Toggle({ checked, onChange }) {
 
 export default function SettingsView({
   state, me, onUpdateSettings, onRestore, onSwitchEmployee, onAddExpense, onDeleteExpense, showToast,
+  firebaseEnabled, user, syncing, syncError, cloudActive, onLogout,
 }) {
   const { settings } = state;
   const importRef = useRef(null);
@@ -123,6 +124,29 @@ export default function SettingsView({
       </div>
 
       <div className="screen">
+        {firebaseEnabled && user && (
+          <div className="card">
+            <div className="section-title">Account</div>
+            <p className="text-dim" style={{ fontSize: 13, marginBottom: 8 }}>{user.email}</p>
+            <p style={{
+              color: syncError ? "#f87171" : syncing ? "#facc15" : cloudActive ? "var(--green)" : "var(--text-dim)",
+              fontSize: 12,
+              marginBottom: 12,
+            }}>
+              {syncError
+                ? `Cloud unavailable — using local backup. ${syncError}`
+                : syncing
+                  ? "Syncing to Firestore…"
+                  : cloudActive
+                    ? "Synced to Firestore"
+                    : "Connecting to cloud…"}
+            </p>
+            <button className="btn btn-ghost btn-block" onClick={() => onLogout()}>
+              Sign Out
+            </button>
+          </div>
+        )}
+
         {/* Profile */}
         <div className="card">
           <div className="section-title">Signed in on this device</div>

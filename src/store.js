@@ -1,5 +1,4 @@
 import { getTodayKey } from "./utils.js";
-import { firebaseState } from "./firebase.js";
 
 // Single-key app state persisted to localStorage. Older releases stored
 // jobs/workday/home under separate keys — migrate those on first load.
@@ -68,28 +67,6 @@ function migrateLegacy() {
   };
 }
 
-// Load from Firebase cloud storage (called in App.jsx on startup)
-export async function loadStateFromFirebase() {
-  try {
-    const cloudState = await firebaseState.load();
-    if (cloudState?.version === 2) {
-      console.log("[v0] Loaded state from Firebase cloud");
-      return {
-        ...cloudState,
-        settings: { ...DEFAULT_SETTINGS, ...cloudState.settings },
-        employees: cloudState.employees || [],
-        jobs: cloudState.jobs || [],
-        workdays: cloudState.workdays || {},
-        prospects: cloudState.prospects || [],
-        expenses: cloudState.expenses || [],
-      };
-    }
-  } catch (error) {
-    console.error("[v0] Failed to load from Firebase:", error);
-  }
-  return null;
-}
-
 export function loadState() {
   const existing = readJSON(STATE_KEY, null);
   if (existing?.version === 2) {
@@ -109,11 +86,22 @@ export function loadState() {
 export function saveState(state) {
   try {
     localStorage.setItem(STATE_KEY, JSON.stringify(state));
-    // Sync to Firebase in background (fire and forget)
-    firebaseState.save(state).catch(err => console.error("[v0] Firebase sync failed:", err));
   } catch {
     // Storage may be full or unavailable; keep the app usable in memory.
   }
+}
+
+// Wipe all locally cached app data (current + legacy keys). Called on logout
+// so a different account signing in on this device can't inherit — or upload
+// to its own cloud document — the previous user's private data.
+export function clearState() {
+  [STATE_KEY, LEGACY_JOBS_KEY, LEGACY_DAY_KEY, LEGACY_HOME_KEY, LEGACY_HOME_COORDS_KEY].forEach((key) => {
+    try {
+      localStorage.removeItem(key);
+    } catch {
+      // Ignore storage access errors — nothing else we can do here.
+    }
+  });
 }
 
 // ── Workday helpers ───────────────────────────────────────────

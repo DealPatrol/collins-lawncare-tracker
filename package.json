@@ -10,6 +10,9 @@
     "ios:open": "cap open ios",
     "ios:sync": "cap sync ios",
     "assets:generate": "capacitor-assets generate --ios",
+    "firebase:keys": "./scripts/fetch-firebase-keys.sh",
+    "firebase:env": "node scripts/sync-firebase-env.js",
+    "firebase:deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules --project lawncare-72560",
     "lint": "eslint .",
     "preview": "vite preview",
     "firebase:check": "node check-firebase.js"
@@ -25,6 +28,7 @@
     "@sendgrid/mail": "^8.1.6",
     "@stripe/stripe-js": "^9.12.1",
     "firebase": "^12.17.0",
+    "firebase-admin": "^13.10.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "stripe": "^22.4.0"
