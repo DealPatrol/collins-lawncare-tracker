@@ -5,6 +5,11 @@ import { haversineMeters } from "./utils.js";
 
 const REGRID_API_URL = "https://app.regrid.com/api/v2/parcels";
 
+function num(value) {
+  const parsed = parseFloat(value);
+  return isFinite(parsed) && parsed > 0 ? parsed : 0;
+}
+
 function geometryCentroid(geometry) {
   let ring = null;
   if (geometry?.type === "Polygon") ring = geometry.coordinates?.[0];
@@ -18,6 +23,7 @@ function geometryCentroid(geometry) {
 function propertyType(useDescription) {
   const use = (useDescription || "").toLowerCase();
   if (use.includes("multi") && use.includes("family")) return "multi_family";
+  if (use.includes("investment")) return "investment";
   if (use.includes("commercial") || use.includes("retail") || use.includes("office")) return "commercial";
   if (use.includes("vacant")) return "vacant";
   if (use.includes("residential") || use.includes("single family") || use.includes("condo")) return "residential";
@@ -36,9 +42,9 @@ function parseProperty(feature) {
     : geometryCentroid(feature.geometry);
 
   const value =
-    parseFloat(property.parval) ||
-    parseFloat(property.improvval) + parseFloat(property.landval) ||
-    parseFloat(property.saleprice) ||
+    num(property.parval) ||
+    num(property.improvval) + num(property.landval) ||
+    num(property.saleprice) ||
     0;
   
   return {
