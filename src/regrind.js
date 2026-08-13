@@ -1,61 +1,89 @@
-// Regrind API - Property discovery and filtering
+// Regrid API - Property discovery and filtering
 // Search by address/area and property type, auto-add as prospects
 
 import { haversineMeters } from "./utils.js";
 
-const REGRIND_API_URL = "https://api.regrind.com/v1";
+const REGRID_API_URL = "https://app.regrid.com/api/v2/parcels";
 
-// Parse comprehensive property data from Regrind response
-function parseProperty(property) {
+function geometryCentroid(geometry) {
+  let ring = null;
+  if (geometry?.type === "Polygon") ring = geometry.coordinates?.[0];
+  if (geometry?.type === "MultiPolygon") ring = geometry.coordinates?.[0]?.[0];
+  if (!ring?.length) return null;
+  const lng = ring.reduce((sum, point) => sum + point[0], 0) / ring.length;
+  const lat = ring.reduce((sum, point) => sum + point[1], 0) / ring.length;
+  return isFinite(lat) && isFinite(lng) ? { lat, lng } : null;
+}
+
+function propertyType(useDescription) {
+  const use = (useDescription || "").toLowerCase();
+  if (use.includes("multi") && use.includes("family")) return "multi_family";
+  if (use.includes("commercial") || use.includes("retail") || use.includes("office")) return "commercial";
+  if (use.includes("vacant")) return "vacant";
+  if (use.includes("residential") || use.includes("single family") || use.includes("condo")) return "residential";
+  return "";
+}
+
+// Parse comprehensive property data from a Regrid GeoJSON feature.
+function parseProperty(feature) {
+  const property = feature?.properties?.fields || feature?.properties || {};
   if (!property.address) return null;
-  
-  const coords = property.latitude && property.longitude 
-    ? { lat: parseFloat(property.latitude), lng: parseFloat(property.longitude) }
-    : null;
 
-  const value = parseFloat(property.estimatedValue) || parseFloat(property.lastsaleamount) || 0;
+  const latitude = parseFloat(property.lat);
+  const longitude = parseFloat(property.lon);
+  const coords = isFinite(latitude) && isFinite(longitude)
+    ? { lat: latitude, lng: longitude }
+    : geometryCentroid(feature.geometry);
+
+  const value =
+    parseFloat(property.parval) ||
+    parseFloat(property.improvval) + parseFloat(property.landval) ||
+    parseFloat(property.saleprice) ||
+    0;
   
   return {
-    id: property.parcelNumber || `${property.address}|${property.zip || ""}`,
+    id: property.ll_uuid || property.parcelnumb || `${property.address}|${property.szip || ""}`,
     address: property.address,
-    city: property.city || "",
-    state: property.state || "",
-    zip: property.zip || "",
-    owner: property.ownerName || "",
-    mailAddress: [property.mailAddress, property.mailCity, property.mailState, property.mailZip]
+    city: property.scity || "",
+    state: property.state2 || "",
+    zip: property.szip || "",
+    owner: property.owner || "",
+    mailAddress: [property.mailadd, property.mail_city, property.mail_state2, property.mail_zip]
       .filter(Boolean)
       .join(", "),
     
     // Basic info
-    propertyType: property.propertyType || "",
-    squareFeet: parseInt(property.squareFeet) || null,
-    lotSize: parseFloat(property.lotSize) || null,
-    yearBuilt: parseInt(property.yearBuilt) || null,
-    bedrooms: parseInt(property.bedrooms) || null,
-    bathrooms: parseFloat(property.bathrooms) || null,
+    propertyType: propertyType(property.usedesc),
+    squareFeet: parseInt(property.sqft) || null,
+    lotSize: parseFloat(property.acres) || null,
+    yearBuilt: parseInt(property.yearbuilt) || null,
+    bedrooms: null,
+    bathrooms: null,
     
     // Detailed info
     value: value > 0 ? value : null,
-    lastSalePrice: parseFloat(property.lastsaleamount) || null,
-    lastSaleDate: property.lastsaledate || null,
-    taxAmount: parseFloat(property.taxAmount) || null,
-    propertyCondition: property.propertyCondition || "", // "excellent" | "good" | "fair" | "poor"
+    lastSalePrice: parseFloat(property.saleprice) || null,
+    lastSaleDate: property.saledate || null,
+    taxAmount: parseFloat(property.taxamt) || null,
+    propertyCondition: "",
     
     // Full info
-    improvementValue: parseFloat(property.improvementValue) || null,
-    landValue: parseFloat(property.landValue) || null,
-    assessedValue: parseFloat(property.assessedValue) || null,
-    stories: parseInt(property.stories) || null,
-    garage: property.garage || "",
-    poolIndicator: property.poolIndicator || false,
+    improvementValue: parseFloat(property.improvval) || null,
+    landValue: parseFloat(property.landval) || null,
+    assessedValue: parseFloat(property.parval) || null,
+    stories: null,
+    garage: "",
+    poolIndicator: false,
     zoning: property.zoning || "",
     
-    // Landscaping indicators
-    hasLawn: property.hasLawn !== false, // assume yes if not specified
-    landscapingType: property.landscapingType || "", // "maintained", "overgrown", "minimal", "professional"
+    landscapingType: "",
     
     coords,
   };
+}
+
+function responseFeatures(data) {
+  return data?.parcels?.features || data?.features || [];
 }
 
 // Search properties by address/area and optional filters
@@ -74,43 +102,37 @@ export async function searchProperties(searchParams, token) {
   }
 
   try {
-    // First, geocode the address
-    const geoRes = await fetch(
-      `${REGRIND_API_URL}/geocode?address=${encodeURIComponent(address)}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    // Regrid's address lookup supplies the center for the nearby-parcel search.
+    const addressQuery = new URLSearchParams({ query: address, limit: "1", token });
+    const geoRes = await fetch(`${REGRID_API_URL}/address?${addressQuery}`);
 
     if (!geoRes.ok) {
-      throw new Error(`Geocoding failed: ${geoRes.statusText}`);
+      if (geoRes.status === 401 || geoRes.status === 403) {
+        throw new Error("Regrid API key rejected — check it in Settings");
+      }
+      throw new Error(`Address lookup failed (HTTP ${geoRes.status})`);
     }
 
     const geoData = await geoRes.json();
-    if (!geoData.latitude || !geoData.longitude) {
+    const centerProperty = responseFeatures(geoData).map(parseProperty).find((property) => property?.coords);
+    if (!centerProperty) {
       throw new Error("Address not found");
     }
 
-    const searchCenter = {
-      lat: parseFloat(geoData.latitude),
-      lng: parseFloat(geoData.longitude),
-    };
-
-    // Build query for property search
-    let query = `latitude=${searchCenter.lat}&longitude=${searchCenter.lng}&radius=${radius}&limit=${limit}`;
-    
-    if (propertyTypes.length > 0) {
-      query += `&propertyTypes=${propertyTypes.join(",")}`;
-    }
-    if (minValue) query += `&minValue=${minValue}`;
-    if (maxValue) query += `&maxValue=${maxValue}`;
+    const searchCenter = centerProperty.coords;
+    const pointQuery = new URLSearchParams({
+      lat: searchCenter.lat.toFixed(6),
+      lon: searchCenter.lng.toFixed(6),
+      radius: String(radius),
+      limit: String(limit),
+      token,
+    });
 
     // Search properties
-    const searchRes = await fetch(
-      `${REGRIND_API_URL}/properties/search?${query}`,
-      { headers: { Authorization: `Bearer ${token}` } }
-    );
+    const searchRes = await fetch(`${REGRID_API_URL}/point?${pointQuery}`);
 
     if (searchRes.status === 401 || searchRes.status === 403) {
-      throw new Error("Regrind token rejected — check it in Settings");
+      throw new Error("Regrid API key rejected — check it in Settings");
     }
 
     if (!searchRes.ok) {
@@ -118,7 +140,12 @@ export async function searchProperties(searchParams, token) {
     }
 
     const searchData = await searchRes.json();
-    const properties = (searchData.properties || []).map(parseProperty).filter(Boolean);
+    const properties = responseFeatures(searchData)
+      .map(parseProperty)
+      .filter(Boolean)
+      .filter((property) => propertyTypes.length === 0 || propertyTypes.includes(property.propertyType))
+      .filter((property) => !minValue || (property.value || 0) >= minValue)
+      .filter((property) => !maxValue || (property.value || 0) <= maxValue);
 
     return {
       center: searchCenter,
@@ -126,7 +153,7 @@ export async function searchProperties(searchParams, token) {
       count: properties.length,
     };
   } catch (error) {
-    console.error("[v0] Regrind search error:", error);
+    console.error("[v0] Regrid search error:", error);
     throw error;
   }
 }
@@ -136,7 +163,12 @@ export function rankProperties(properties, { jobs = [], prospects = [], center, 
   const normalizeAddr = (a) => (a || "").toLowerCase().replace(/[^a-z0-9]/g, "");
   
   const knownAddrs = new Set(
-    [...jobs, ...prospects].map((x) => normalizeAddr(x.address)).filter(Boolean)
+    [...jobs, ...prospects]
+      .flatMap((x) => [
+        normalizeAddr(x.address),
+        normalizeAddr([x.address, x.city].filter(Boolean).join(", ")),
+      ])
+      .filter(Boolean)
   );
   const knownCoords = [...jobs, ...prospects].map((x) => x.coords).filter(Boolean);
 
@@ -145,7 +177,11 @@ export function rankProperties(properties, { jobs = [], prospects = [], center, 
     .filter((p) => {
       if (seen.has(p.id)) return false;
       seen.add(p.id);
-      if (knownAddrs.has(normalizeAddr(p.address))) return false;
+      const addresses = [
+        normalizeAddr(p.address),
+        normalizeAddr([p.address, p.city].filter(Boolean).join(", ")),
+      ];
+      if (addresses.some((address) => knownAddrs.has(address))) return false;
       if (p.coords && knownCoords.some((c) => haversineMeters(p.coords, c) < 40)) return false;
       return true;
     })

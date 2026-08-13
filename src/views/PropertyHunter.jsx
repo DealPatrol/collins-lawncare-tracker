@@ -11,7 +11,7 @@ const PROPERTY_TYPES = [
   { value: "vacant", label: "Vacant Land" },
 ];
 
-export default function PropertyHunter({ state, setState, regrindToken }) {
+export default function PropertyHunter({ state, setState, regridToken }) {
   const [searchAddress, setSearchAddress] = useState("");
   const [selectedTypes, setSelectedTypes] = useState(["residential", "investment", "multi_family"]);
   const [radius, setRadius] = useState(2000); // meters
@@ -27,18 +27,19 @@ export default function PropertyHunter({ state, setState, regrindToken }) {
 
   const handleSearch = async (e) => {
     e.preventDefault();
+    setSearchResults(null);
+    setSelectedProperties(new Set());
     if (!searchAddress.trim()) {
       setError("Please enter an address or area");
       return;
     }
-    if (!regrindToken) {
-      setError("Regrind API token not configured. Please add it in Settings.");
+    if (!regridToken) {
+      setError("Regrid API key not configured. Please add it in Settings.");
       return;
     }
 
     setSearching(true);
     setError(null);
-    setSelectedProperties(new Set());
 
     try {
       const results = await searchProperties(
@@ -50,7 +51,7 @@ export default function PropertyHunter({ state, setState, regrindToken }) {
           maxValue: maxValue ? parseInt(maxValue) : null,
           limit: parseInt(limit),
         },
-        regrindToken
+        regridToken
       );
 
       // Rank and deduplicate against existing jobs/prospects
@@ -115,16 +116,15 @@ export default function PropertyHunter({ state, setState, regrindToken }) {
 
       const newProspects = propertiesToAdd.map((prop) =>
         makeProspect({
-          address: prop.address,
+          address: [prop.address, prop.city].filter(Boolean).join(", "),
           city: prop.city,
           zip: prop.zip,
           owner: prop.owner,
           mailAddress: prop.mailAddress,
           coords: prop.coords,
           value: prop.value,
-          source: "regrind",
+          source: "regrid",
           name: prop.owner || "Property Lead",
-          targetMonthly: prop.value ? Math.round(prop.value / 300) : null, // rough estimate
         })
       );
 

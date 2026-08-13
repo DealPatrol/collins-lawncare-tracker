@@ -380,7 +380,7 @@ export default function App() {
     }
     if (tab === "jobs") return <JobsView {...shared} />;
     if (tab === "route") return <RouteView {...shared} />;
-    if (tab === "hunter") return <PropertyHunter state={state} setState={setState} regrindToken={state.settings.regrindToken} />;
+    if (tab === "hunter") return <PropertyHunter state={state} setState={setState} regridToken={state.settings.regridToken} />;
     if (tab === "crew") return <CrewView {...shared} onAddEmployee={addEmployee} onRemoveEmployee={removeEmployee} onSwitchEmployee={switchEmployee} onJoinCrew={joinCrew} getInviteCode={() => encodeCrewInvite(state)} />;
     if (tab === "settings") {
       return <SettingsView {...shared} onUpdateSettings={updateSettings} onRestore={restoreState} onSwitchEmployee={switchEmployee} />;
