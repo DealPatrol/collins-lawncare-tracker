@@ -17,7 +17,7 @@ Your app can automatically send invoices and job completion notifications to cus
 1. Go to **Settings** → **API Keys**
 2. Click **Create API Key**
 3. Name it: `collins-lawncare`
-4. Select **Full Access** or configure specific permissions
+4. Grant only the **Mail Send** permission
 5. Copy the API key (starts with `SG.`)
 
 ## Step 3: Verify Your Sender Email
@@ -36,6 +36,10 @@ Add to your `.env.local`:
 SENDGRID_API_KEY=SG_your_api_key_here
 SENDGRID_FROM_EMAIL=noreply@collinslawncare.com
 ```
+
+These are server-only values. The full environment reference, including
+Stripe, Firebase Admin, portal signing, and `APP_URL`, is in
+[docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md).
 
 Replace:
 - `SG_your_api_key_here` with your actual API key

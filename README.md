@@ -33,6 +33,10 @@ npm install
 npm run dev
 ```
 
+Copy `.env.example` to `.env.local` and supply the values needed for the
+features you use. See **[docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md)** for the
+complete browser and server variable reference. Never commit real secrets.
+
 ## iOS App Store
 
 This app ships as a native iOS app via Capacitor. See **[APP_STORE.md](./APP_STORE.md)** for the full submission checklist.
@@ -65,16 +69,16 @@ npx -y firebase-tools@latest login
 npm run firebase:deploy:rules
 ```
 
-Deploy Firestore security rules (required for production mode):
-
-```bash
-npx -y firebase-tools@latest login
-npm run firebase:deploy:rules
-```
-
 - **Firebase architecture:** [docs/FIREBASE.md](./docs/FIREBASE.md)
 - **Security rules audit:** [docs/FIRESTORE_RULES_AUDIT.md](./docs/FIRESTORE_RULES_AUDIT.md)
 - **iOS native Firebase (stubbed):** [docs/IOS_FIREBASE.md](./docs/IOS_FIREBASE.md)
+
+## Test
+
+```bash
+npm test       # unit tests plus Firestore emulator rule tests
+npm run build
+```
 
 ## Built With
 - React + Vite

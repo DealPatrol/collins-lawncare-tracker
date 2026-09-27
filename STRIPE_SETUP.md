@@ -16,7 +16,9 @@ This app integrates Stripe for processing customer payments on invoices. Follow 
 In your Stripe Dashboard:
 - Go to **Developers** → **API Keys**
 - Copy **Publishable key** (starts with `pk_`)
-- Copy **Secret key** (starts with `sk_`)
+- Create a **restricted key** (starts with `rk_`) with only PaymentIntent
+  create/read access. Use a full secret key only if restricted keys cannot
+  support the configured account.
 
 ## Step 3: Configure Environment Variables
 
@@ -24,7 +26,7 @@ Create or edit `.env.local` in your project root:
 
 ```
 VITE_STRIPE_PUBLIC_KEY=pk_test_your_publishable_key_here
-STRIPE_SECRET_KEY=sk_test_your_secret_key_here
+STRIPE_SECRET_KEY=rk_test_your_restricted_key_here
 STRIPE_WEBHOOK_SECRET=whsec_your_webhook_secret_here
 ```
 
@@ -39,6 +41,11 @@ Once deployed to production:
 3. Enter your webhook URL: `https://yourapp.vercel.app/api/stripe-webhook`
 4. Select events: `payment_intent.succeeded`, `payment_intent.payment_failed`, `charge.refunded`
 5. Copy the webhook signing secret to your `.env.local` as `STRIPE_WEBHOOK_SECRET`
+
+The endpoint verifies the signature against the unmodified request bytes before
+processing an event. It records the Stripe event ID in Firestore so retries are
+idempotent. PaymentIntents created before this implementation may not include
+the required `userId` and `jobId` metadata and will be rejected safely.
 
 ## How It Works
 
@@ -55,6 +62,9 @@ Once deployed to production:
 
 - **create-payment-intent.js** - Creates a payment intent with Stripe
 - **stripe-webhook.js** - Receives payment confirmations and updates job status
+
+All environment variables, including Firebase Admin, portal, SendGrid, and
+`APP_URL`, are documented in [docs/ENVIRONMENT.md](./docs/ENVIRONMENT.md).
 
 ## Testing Payments
 

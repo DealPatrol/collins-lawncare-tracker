@@ -22,6 +22,7 @@ This app does **not** use Firebase Realtime Database.
 3. Verify: `npm run firebase:check`
 
 See [KEYS.md](./KEYS.md) for credential setup.
+See [ENVIRONMENT.md](./ENVIRONMENT.md) for every browser and server variable.
 
 ## Deploy rules
 
@@ -38,8 +39,13 @@ Customers open `/portal?token=...` with a link signed by the server.
 
 Required server env vars (Vercel):
 
-- `PORTAL_TOKEN_SECRET` — random string for signing portal tokens
+- `PORTAL_TOKEN_SECRET` — at least 32 random bytes for signing seven-day portal tokens
 - `FIREBASE_SERVICE_ACCOUNT` — JSON service account with Firestore read access
+- `APP_URL` — public app origin used to construct portal links
+
+Payments and email additionally require `STRIPE_SECRET_KEY`,
+`STRIPE_WEBHOOK_SECRET`, `SENDGRID_API_KEY`, and `SENDGRID_FROM_EMAIL`; see the
+environment reference for scopes and formats.
 
 Optional client env:
 
