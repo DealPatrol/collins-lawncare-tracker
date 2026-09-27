@@ -11,6 +11,7 @@ export function formatJobForPortal(job) {
     pay: job.pay,
     billing: job.billing,
     monthlyRate: job.monthlyRate,
+    paymentStatus: job.paymentStatus,
     photos: job.photos || [],
     notes: job.notes,
     completedAt: job.endTime,
@@ -19,6 +20,8 @@ export function formatJobForPortal(job) {
       amount: p.amount,
       date: p.date,
       status: p.status,
+      refundedAmount: p.refundedAmount,
+      refundedAt: p.refundedAt,
     })),
   };
 }

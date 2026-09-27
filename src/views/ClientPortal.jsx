@@ -71,6 +71,11 @@ export default function ClientPortal() {
   }
 
   const portalToken = new URLSearchParams(window.location.search).get('token');
+  const paymentLabel = job.paymentStatus === 'refunded'
+    ? 'Refunded'
+    : job.paymentStatus === 'partially_refunded'
+      ? 'Partially refunded'
+      : 'Paid in full';
 
   return (
     <div style={portalStyles.container}>
@@ -129,12 +134,15 @@ export default function ClientPortal() {
         {job.payments && job.payments.length > 0 ? (
           <div>
             <div style={{ fontSize: 12, color: '#22c55e', marginTop: 8, fontWeight: 600 }}>
-              Paid in full
+              {paymentLabel}
             </div>
             {job.payments.map((p) => (
               <div key={p.id} style={portalStyles.paymentItem}>
                 <div style={{ fontSize: 12, color: '#64748b' }}>{new Date(p.date).toLocaleDateString()}</div>
-                <div style={{ fontWeight: 600, color: '#22c55e' }}>${p.amount.toFixed(2)}</div>
+                <div style={{ fontWeight: 600, color: '#22c55e' }}>
+                  ${p.amount.toFixed(2)}
+                  {p.refundedAmount > 0 ? ` · $${p.refundedAmount.toFixed(2)} refunded` : ''}
+                </div>
               </div>
             ))}
           </div>

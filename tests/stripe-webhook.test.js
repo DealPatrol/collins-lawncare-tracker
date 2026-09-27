@@ -75,4 +75,41 @@ describe('Stripe webhook job updates', () => {
       status: 'refunded',
     });
   });
+
+  it('preserves terminal payment state when events arrive out of order', () => {
+    const refundEvent = event('evt_refund', 'charge.refunded', {
+      id: 'ch_1',
+      payment_intent: 'pi_1',
+      amount: 12500,
+      amount_refunded: 12500,
+      refunded: true,
+    });
+    const refundedFirst = applyChargeRefunded(
+      { id: 'job-1' },
+      refundEvent.data.object,
+      refundEvent
+    );
+    const successEvent = event('evt_paid', 'payment_intent.succeeded', {
+      id: 'pi_1',
+      amount_received: 12500,
+    });
+    const delayedSuccess = applyPaymentSucceeded(
+      refundedFirst,
+      successEvent.data.object,
+      successEvent
+    );
+    const failureEvent = event('evt_failed', 'payment_intent.payment_failed', {
+      id: 'pi_1',
+    });
+    const delayedFailure = applyPaymentFailed(
+      delayedSuccess,
+      failureEvent.data.object,
+      failureEvent
+    );
+
+    expect(delayedFailure.paymentStatus).toBe('refunded');
+    expect(delayedFailure.payments).toEqual([
+      expect.objectContaining({ id: 'pi_1', status: 'refunded' }),
+    ]);
+  });
 });

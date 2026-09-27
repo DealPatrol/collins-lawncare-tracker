@@ -1,3 +1,4 @@
+import crypto from 'crypto';
 import Stripe from 'stripe';
 import { verifyFirebaseIdToken } from '../lib/firebase-admin.js';
 import { loadJobForPortal } from '../lib/portal-data.js';
@@ -32,6 +33,12 @@ export default async function handler(req, res) {
     if (!job) {
       return res.status(404).json({ error: 'Job not found' });
     }
+    const hasSettledPayment = (job.payments || []).some((payment) =>
+      ['completed', 'succeeded', 'partially_refunded'].includes(payment.status)
+    );
+    if (hasSettledPayment) {
+      return res.status(409).json({ error: 'This invoice is already paid' });
+    }
 
     const amount = Math.round(Number(job.pay) * 100);
     if (!Number.isSafeInteger(amount) || amount < 50) {
@@ -39,6 +46,20 @@ export default async function handler(req, res) {
     }
 
     const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+    const invoiceRevision = JSON.stringify({
+      userId,
+      jobId,
+      amount,
+      payments: (job.payments || []).map((payment) => ({
+        id: payment.id,
+        status: payment.status,
+        refundedAmount: payment.refundedAmount || 0,
+      })),
+    });
+    const idempotencyKey = `invoice_${crypto
+      .createHash('sha256')
+      .update(invoiceRevision)
+      .digest('hex')}`;
     const paymentIntent = await stripe.paymentIntents.create({
       amount,
       currency: 'usd',
@@ -46,7 +67,7 @@ export default async function handler(req, res) {
         jobId,
         userId,
       },
-    });
+    }, { idempotencyKey });
 
     return res.status(200).json({
       clientSecret: paymentIntent.client_secret,
