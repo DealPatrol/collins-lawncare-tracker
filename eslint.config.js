@@ -7,7 +7,7 @@ import { defineConfig, globalIgnores } from 'eslint/config'
 export default defineConfig([
   globalIgnores(['dist', 'ios']),
   {
-    files: ['check-firebase.js', 'scripts/**/*.js', 'api/**/*.js', 'lib/**/*.js'],
+    files: ['check-firebase.js', 'scripts/**/*.js', 'api/**/*.js', 'lib/**/*.js', 'tests/**/*.js'],
     languageOptions: {
       globals: globals.node,
     },

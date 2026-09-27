@@ -15,17 +15,17 @@ export const getStripe = () => {
   return stripePromise;
 };
 
-// Create a payment intent for an invoice
-export const createPaymentIntent = async (amount, jobId, customerId) => {
+// Create a payment intent for an invoice. The server loads the amount from
+// Firestore so callers cannot alter it.
+export const createPaymentIntent = async ({ jobId, portalToken, idToken } = {}) => {
   try {
     const response = await fetch('/api/create-payment-intent', {
       method: 'POST',
-      headers: { 'Content-Type': 'application/json' },
-      body: JSON.stringify({
-        amount: Math.round(amount * 100), // Convert to cents
-        jobId,
-        customerId,
-      }),
+      headers: {
+        'Content-Type': 'application/json',
+        ...(idToken ? { Authorization: `Bearer ${idToken}` } : {}),
+      },
+      body: JSON.stringify({ jobId, portalToken }),
     });
 
     if (!response.ok) throw new Error('Failed to create payment intent');
@@ -38,14 +38,14 @@ export const createPaymentIntent = async (amount, jobId, customerId) => {
 };
 
 // Process payment with Stripe Elements
-export const processPayment = async (stripe, elements, amount, jobId) => {
+export const processPayment = async (stripe, elements, { jobId, portalToken, idToken }) => {
   if (!stripe || !elements) return null;
 
   try {
     const cardElement = elements.getElement('card');
     
     // Create payment intent
-    const clientSecret = await createPaymentIntent(amount, jobId);
+    const clientSecret = await createPaymentIntent({ jobId, portalToken, idToken });
     if (!clientSecret) return null;
 
     // Confirm payment

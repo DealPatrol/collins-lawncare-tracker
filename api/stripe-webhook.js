@@ -1,61 +1,56 @@
 import Stripe from 'stripe';
+import { processStripeEvent } from '../lib/stripe-webhook.js';
 
-const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+export const config = {
+  api: {
+    bodyParser: false,
+  },
+};
+
+async function readRawBody(req) {
+  if (Buffer.isBuffer(req.body)) return req.body;
+  if (typeof req.body === 'string') return Buffer.from(req.body);
+
+  const chunks = [];
+  for await (const chunk of req) {
+    chunks.push(Buffer.isBuffer(chunk) ? chunk : Buffer.from(chunk));
+  }
+  return Buffer.concat(chunks);
+}
 
 export default async function handler(req, res) {
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
 
-  const sig = req.headers['stripe-signature'];
-  let event;
+  if (!process.env.STRIPE_SECRET_KEY || !process.env.STRIPE_WEBHOOK_SECRET) {
+    return res.status(503).json({ error: 'Stripe webhook is not configured' });
+  }
 
-  try {
-    event = stripe.webhooks.constructEvent(
-      req.body,
-      sig,
-      process.env.STRIPE_WEBHOOK_SECRET
-    );
-  } catch (error) {
-    console.error('[v0] Webhook signature verification failed:', error.message);
-    return res.status(400).json({ error: 'Invalid signature' });
+  const stripe = new Stripe(process.env.STRIPE_SECRET_KEY);
+  const sig = req.headers['stripe-signature'];
+  if (!sig) {
+    return res.status(400).json({ error: 'Missing Stripe signature' });
   }
 
   try {
-    switch (event.type) {
-      case 'payment_intent.succeeded': {
-        const paymentIntent = event.data.object;
-        console.log('[v0] Payment succeeded:', paymentIntent.id);
-        
-        // TODO: Update job payment status in Firebase
-        // const { jobId } = paymentIntent.metadata;
-        // await updateJobPaymentStatus(jobId, 'paid', paymentIntent.id);
-        break;
-      }
+    const rawBody = await readRawBody(req);
+    const event = stripe.webhooks.constructEvent(
+      rawBody,
+      sig,
+      process.env.STRIPE_WEBHOOK_SECRET
+    );
 
-      case 'payment_intent.payment_failed': {
-        const paymentIntent = event.data.object;
-        console.log('[v0] Payment failed:', paymentIntent.id);
-        
-        // TODO: Log payment failure
-        break;
-      }
-
-      case 'charge.refunded': {
-        const charge = event.data.object;
-        console.log('[v0] Charge refunded:', charge.id);
-        
-        // TODO: Update job status to refunded
-        break;
-      }
-
-      default:
-        console.log(`[v0] Unhandled event type: ${event.type}`);
-    }
-
-    res.status(200).json({ received: true });
+    const result = await processStripeEvent(stripe, event);
+    return res.status(200).json({ received: true, ...result });
   } catch (error) {
-    console.error('[v0] Webhook processing error:', error);
-    res.status(500).json({ error: 'Webhook processing failed' });
+    const signatureError = error.type === 'StripeSignatureVerificationError';
+    console.error(
+      signatureError ? '[stripe-webhook] Invalid signature' : '[stripe-webhook] Processing failed',
+      error.message
+    );
+    return res.status(signatureError ? 400 : 500).json({
+      error: signatureError ? 'Invalid signature' : 'Webhook processing failed',
+    });
   }
 }

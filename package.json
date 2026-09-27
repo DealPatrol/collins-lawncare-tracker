@@ -15,7 +15,10 @@
     "firebase:deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules --project lawncare-72560",
     "lint": "eslint .",
     "preview": "vite preview",
-    "firebase:check": "node check-firebase.js"
+    "firebase:check": "node check-firebase.js",
+    "test": "npm run test:unit && npm run test:rules",
+    "test:unit": "vitest run --exclude tests/firestore.rules.test.js",
+    "test:rules": "firebase emulators:exec --only firestore --project demo-collins-lawncare \"vitest run tests/firestore.rules.test.js\""
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",
@@ -28,7 +31,7 @@
     "@sendgrid/mail": "^8.1.6",
     "@stripe/stripe-js": "^9.12.1",
     "firebase": "^12.17.0",
-    "firebase-admin": "^13.10.0",
+    "firebase-admin": "^14.5.0",
     "react": "^19.2.6",
     "react-dom": "^19.2.6",
     "stripe": "^22.4.0"
@@ -36,14 +39,17 @@
   "devDependencies": {
     "@capacitor/assets": "^3.0.5",
     "@eslint/js": "^10.0.1",
+    "@firebase/rules-unit-testing": "^5.0.2",
     "@types/react": "^19.2.14",
     "@types/react-dom": "^19.2.3",
     "@vitejs/plugin-react": "^6.0.1",
     "eslint": "^10.3.0",
     "eslint-plugin-react-hooks": "^7.1.1",
     "eslint-plugin-react-refresh": "^0.5.2",
+    "firebase-tools": "^15.31.0",
     "globals": "^17.6.0",
-    "vite": "^8.0.12"
+    "vite": "^8.0.12",
+    "vitest": "^5.0.2"
   },
   "description": "Lawncare schedule and pay efficiency tracker"
 }

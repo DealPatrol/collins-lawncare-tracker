@@ -4,7 +4,7 @@ Audited against the `firebase-security-rules-auditor` checklist for `firestore.r
 
 ## Score: 4 / 5 (Minor issues only)
 
-**Summary:** Rules enforce strict per-user ownership (`request.auth.uid == userId`), default-deny for all other paths, identical validation on create and update, field allowlisting via `hasOnly()`, and resource limits on array size and string length. Suitable for a single-user-per-document lawncare tracker.
+**Summary:** Rules enforce strict per-user ownership (`request.auth.uid == userId`), default-deny for all other paths, identical validation on create and update, field allowlisting via `hasOnly()`, and top-level list size limits. Suitable for a single-user-per-document lawncare tracker.
 
 ## Findings
 
@@ -13,8 +13,8 @@ Audited against the `firebase-security-rules-auditor` checklist for `firestore.r
 | Update bypass | — | Create and update share `isValidAppData()` | ✅ No bypass found |
 | Authority source | — | No user-writable role/admin fields | ✅ Secure |
 | Business logic | — | Owner can read/write their `users/{uid}/data/app` doc | ✅ Matches app |
-| Storage abuse | Minor | Individual `jobs[]` items are not schema-validated | Acceptable for v1; add field-level validation if storing PII in job notes |
-| Type safety | — | Lists, maps, strings, timestamps, numbers checked | ✅ |
+| Storage abuse | Minor | Individual list items and nested strings are not schema-validated | Add a normalized per-record collection model if stronger field-level limits become necessary |
+| Type safety | — | Top-level lists, maps, active employee ID, version, and timestamp are checked | ✅ |
 | Identity-level security | — | `isOwner(userId)` on every operation | ✅ |
 | Document scope | — | `docId == 'app'` prevents stray documents | ✅ |
 
@@ -27,4 +27,8 @@ npx -y firebase-tools@latest login
 npm run firebase:deploy:rules
 ```
 
-I've set up prototype Security Rules to keep each user's lawncare data private. They are designed to be secure for a single-owner document model with authenticated email/password users. Review and verify them before broadly sharing the app.
+Run the emulator-backed regression suite without accessing production:
+
+```bash
+npm run test:rules
+```

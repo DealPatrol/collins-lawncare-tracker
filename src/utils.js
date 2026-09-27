@@ -83,6 +83,14 @@ export function haversineMeters(a, b) {
   return 2 * EARTH_RADIUS_M * Math.asin(Math.sqrt(h));
 }
 
+export function isWithinGeofence(site, fix, radiusM, includeAccuracy = false) {
+  if (!site || !fix || !Number.isFinite(radiusM) || radiusM < 0) return false;
+  const accuracyAllowance = includeAccuracy
+    ? Math.min(Math.max(Number(fix.accuracy) || 0, 0), 50)
+    : 0;
+  return haversineMeters(site, fix) <= radiusM + accuracyAllowance;
+}
+
 // ── Route optimization ────────────────────────────────────────
 // Nearest-neighbor construction followed by 2-opt improvement.
 // Returns the input jobs reordered for the shortest round trip from `origin`.

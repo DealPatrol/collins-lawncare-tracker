@@ -11,6 +11,7 @@ Firestore database: **production mode**, location **nam5**
 Auth: **Email/Password** enabled
 
 **Architecture overview:** [FIREBASE.md](./FIREBASE.md)
+**Complete environment reference:** [ENVIRONMENT.md](./ENVIRONMENT.md)
 
 ## Keys your app needs
 
@@ -19,6 +20,12 @@ Auth: **Email/Password** enabled
 | `VITE_FIREBASE_*` env vars | Web app Firebase SDK | Yes (auth + sync) |
 | `PORTAL_TOKEN_SECRET` | Sign customer portal links (server) | For client portal |
 | `FIREBASE_SERVICE_ACCOUNT` | Server reads Firestore for portal API | For client portal |
+| `APP_URL` | Build absolute customer portal links | For client portal |
+| `STRIPE_SECRET_KEY` | Create/read PaymentIntents (prefer restricted key) | For payments |
+| `STRIPE_WEBHOOK_SECRET` | Verify Stripe webhook signatures | For payments |
+| `VITE_STRIPE_PUBLIC_KEY` | Load Stripe.js in the browser | For payments |
+| `SENDGRID_API_KEY` | Send invoice and completion emails | For email |
+| `SENDGRID_FROM_EMAIL` | Authenticated sender address | For email |
 | `VITE_API_BASE_URL` | API host for Capacitor / split deploy | When API is not same origin |
 | `GoogleService-Info.plist` | Native iOS Firebase SDK | Only if adding Firebase to iOS |
 | Apple Developer account | App Store signing | For App Store only |

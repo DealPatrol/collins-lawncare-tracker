@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { watchCoords } from "./location.js";
-import { haversineMeters, isMowedThisWeek } from "./utils.js";
+import { haversineMeters, isMowedThisWeek, isWithinGeofence } from "./utils.js";
 
 const MAX_FIX_ACCURACY_M = 50; // ignore fixes worse than this for distance
 const MAX_SEGMENT_M = 1000; // discard GPS teleports
@@ -62,9 +62,8 @@ export function useGpsTracking({ enabled, config, onDistance, onAutoStop, onArri
       // ── Geofence auto-stop for the active job ──
       const activeJob = cfg?.activeJob;
       if (cfg?.autoStop && activeJob?.coords) {
-        const radius = (activeJob.radius || cfg.geofenceRadius || 150) + Math.min(fix.accuracy || 0, 50);
-        const dist = haversineMeters(activeJob.coords, fix);
-        if (dist > radius) {
+        const radius = activeJob.radius || cfg.geofenceRadius || 150;
+        if (!isWithinGeofence(activeJob.coords, fix, radius, true)) {
           track.exitCount += 1;
           if (!track.exitSince) track.exitSince = fix.timestamp || Date.now();
           const outsideMs = (fix.timestamp || Date.now()) - track.exitSince;
@@ -91,7 +90,7 @@ export function useGpsTracking({ enabled, config, onDistance, onAutoStop, onArri
         const nearby = cfg.jobs.find((job) => {
           if (!job.coords || isMowedThisWeek(job)) return false;
           const radius = job.radius || cfg.geofenceRadius || 150;
-          return haversineMeters(job.coords, fix) <= radius;
+          return isWithinGeofence(job.coords, fix, radius);
         });
 
         if (nearby) {
