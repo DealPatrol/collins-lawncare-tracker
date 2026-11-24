@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { doc, onSnapshot, serverTimestamp, setDoc } from "firebase/firestore";
 import { db } from "./firebase.js";
 import { DEFAULT_SETTINGS } from "./store.js";
@@ -77,6 +77,37 @@ export function useFirestoreSync(user, state, setState) {
   const remoteLoaded = useRef(!user);
   const skipSave = useRef(true);
   const initialLocal = useRef(null);
+  // Account deletion/sign-out must stop *both* writes and the initial-document
+  // recreation listener before deleting data. Track in-flight writes so pause
+  // can drain them before the caller deletes the cloud document.
+  const suspended = useRef(false);
+  const unsubscribeRef = useRef(null);
+  const saveTimerRef = useRef(null);
+  const pendingWrites = useRef(new Set());
+  const [syncEpoch, setSyncEpoch] = useState(0);
+  const trackedWrite = useCallback((promise) => {
+    pendingWrites.current.add(promise);
+    promise.finally(() => pendingWrites.current.delete(promise)).catch(() => {});
+    return promise;
+  }, []);
+  const pauseSync = useCallback(async ({ drain = true, timeoutMs = 8000 } = {}) => {
+    suspended.current = true;
+    unsubscribeRef.current?.();
+    unsubscribeRef.current = null;
+    clearTimeout(saveTimerRef.current);
+    if (!drain) return;
+    // Let already-submitted writes settle before the caller deletes the cloud
+    // document. Firestore applies one client's writes in order anyway, so the
+    // timeout only bounds how long a slow connection can stall the UI.
+    await Promise.race([
+      Promise.allSettled([...pendingWrites.current]),
+      new Promise((resolve) => setTimeout(resolve, timeoutMs)),
+    ]);
+  }, []);
+  const resumeSync = useCallback(() => {
+    suspended.current = false;
+    setSyncEpoch((e) => e + 1);
+  }, []);
 
   useEffect(() => {
     if (user) initialLocal.current = serializeState(state);
@@ -85,6 +116,7 @@ export function useFirestoreSync(user, state, setState) {
   }, [user?.uid]);
 
   useEffect(() => {
+    if (suspended.current) return;
     if (!user || !db) {
       remoteLoaded.current = true;
       skipSave.current = false;
@@ -99,10 +131,12 @@ export function useFirestoreSync(user, state, setState) {
     const unsubscribe = onSnapshot(
       docRef,
       async (snapshot) => {
+        if (suspended.current) return;
         try {
           if (!snapshot.exists()) {
             const payload = initialLocal.current ?? serializeState(state);
-            await setDoc(docRef, { ...payload, updatedAt: serverTimestamp() });
+            await trackedWrite(setDoc(docRef, { ...payload, updatedAt: serverTimestamp() }));
+            if (suspended.current) return;
             remoteLoaded.current = true;
             skipSave.current = false;
             setCloudActive(true);
@@ -136,13 +170,17 @@ export function useFirestoreSync(user, state, setState) {
       }
     );
 
-    return unsubscribe;
+    unsubscribeRef.current = unsubscribe;
+    return () => {
+      unsubscribe();
+      if (unsubscribeRef.current === unsubscribe) unsubscribeRef.current = null;
+    };
     // Snapshot listener is tied to the signed-in user only.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, setState]);
+  }, [user?.uid, setState, syncEpoch]);
 
   useEffect(() => {
-    if (!user || !db || !remoteLoaded.current) return;
+    if (suspended.current || !user || !db || !remoteLoaded.current) return;
     if (skipSave.current) {
       // A remote snapshot just populated local state; consume the guard so
       // this render's data isn't written back (which would re-trigger the
@@ -154,13 +192,14 @@ export function useFirestoreSync(user, state, setState) {
 
     setSyncing(true);
     const timer = setTimeout(async () => {
+      if (suspended.current) return;
       try {
         const docRef = doc(db, "users", user.uid, "data", "app");
-        await setDoc(
+        await trackedWrite(setDoc(
           docRef,
           { ...serializeState(state), updatedAt: serverTimestamp() },
           { merge: true }
-        );
+        ));
         setSyncError("");
         setCloudActive(true);
       } catch (err) {
@@ -171,10 +210,11 @@ export function useFirestoreSync(user, state, setState) {
       }
     }, 600);
 
+    saveTimerRef.current = timer;
     return () => clearTimeout(timer);
     // Debounced push of full app state while signed in.
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [user?.uid, state]);
+  }, [user?.uid, state, syncEpoch]);
 
-  return { syncing, syncError, cloudActive };
+  return { syncing, syncError, cloudActive, pauseSync, resumeSync };
 }

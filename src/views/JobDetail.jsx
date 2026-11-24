@@ -2,6 +2,7 @@ import { useState } from "react";
 import { useAuth } from "../useAuth.js";
 import { getFirebaseAuth } from "../firebase.js";
 import { createPortalLink } from "../portal.js";
+import { isNative, shareText } from "../native.js";
 import {
   formatClock, formatDuration, formatMoney, getAvgTime, getHourlyRate,
   getTotalTime, isMowedThisWeek, priorityMeta, rateColorClass,
@@ -47,7 +48,15 @@ export default function JobDetail({
         customerEmail: job.customerEmail || null,
         idToken,
       });
-      if (navigator.clipboard?.writeText) {
+      if (isNative()) {
+        // iOS share sheet: Messages, Mail, AirDrop, Copy.
+        const result = await shareText({
+          title: `${job.name} — job & invoice`,
+          text: `Here's your job status and invoice for ${job.name}:`,
+          url,
+        });
+        if (result === "shared") showToast?.("Portal link shared.");
+      } else if (navigator.clipboard?.writeText) {
         await navigator.clipboard.writeText(url);
         showToast?.("Portal link copied to clipboard.");
       } else {

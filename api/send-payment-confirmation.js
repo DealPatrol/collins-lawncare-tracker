@@ -1,8 +1,12 @@
+import { applyCors } from '../lib/cors.js';
+import { businessName, fromEmail } from '../lib/business.js';
 import sgMail from '@sendgrid/mail';
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 export default async function handler(req, res) {
+  if (applyCors(req, res, { methods: 'POST, OPTIONS' })) return;
+  const bizName = businessName();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -54,14 +58,14 @@ export default async function handler(req, res) {
         
         <div style="color: #64748b; font-size: 12px; text-align: center; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
           <p>For your records, please keep this email with your documentation.</p>
-          <p>&copy; ${new Date().getFullYear()} Collins Lawncare. All rights reserved.</p>
+          <p>&copy; ${new Date().getFullYear()} ${bizName}. All rights reserved.</p>
         </div>
       </div>
     `;
 
     const msg = {
       to: customerEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@collinslawncare.com',
+      from: fromEmail(),
       subject: `Payment Confirmation - ${jobName}`,
       html,
       trackingSettings: {

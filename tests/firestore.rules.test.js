@@ -4,7 +4,7 @@ import {
   assertSucceeds,
   initializeTestEnvironment,
 } from '@firebase/rules-unit-testing';
-import { doc, getDoc, setDoc } from 'firebase/firestore';
+import { deleteDoc, doc, getDoc, setDoc } from 'firebase/firestore';
 import { afterAll, beforeAll, beforeEach, describe, it } from 'vitest';
 
 const PROJECT_ID = 'demo-collins-lawncare';
@@ -89,5 +89,14 @@ describe('Firestore security rules', () => {
     const other = doc(alice.firestore(), 'users', 'alice', 'data', 'other');
 
     await assertFails(setDoc(other, validAppData()));
+  });
+
+  it('lets the owner delete their app document (in-app account deletion) but not another user', async () => {
+    const alice = testEnvironment.authenticatedContext('alice');
+    const bob = testEnvironment.authenticatedContext('bob');
+    await assertSucceeds(setDoc(appDocument(alice), validAppData()));
+
+    await assertFails(deleteDoc(appDocument(bob, 'alice')));
+    await assertSucceeds(deleteDoc(appDocument(alice)));
   });
 });

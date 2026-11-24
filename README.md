@@ -1,4 +1,6 @@
-# Collins Lawncare Tracker
+# TurfRoute
+
+> Formerly *Collins Lawncare Tracker*. The product name, bundle ID and URL scheme live in one place — [`src/brand.js`](./src/brand.js) — run `npm run brand:apply` after changing it.
 
 A crew-ready lawncare operations app: GPS-automated time tracking, route planning, and pay efficiency — built for the field.
 
@@ -39,7 +41,7 @@ complete browser and server variable reference. Never commit real secrets.
 
 ## iOS App Store
 
-This app ships as a native iOS app via Capacitor. See **[APP_STORE.md](./APP_STORE.md)** for the full submission checklist.
+This app ships as a native iOS app via Capacitor 8 (Swift Package Manager). See **[IOS_APP_STORE.md](./IOS_APP_STORE.md)** for the full App Store checklist (metadata, privacy label, review notes, StoreKit 2 Pro subscriptions, Xcode Cloud).
 
 Quick start on a Mac:
 
@@ -49,8 +51,9 @@ npm run build:ios   # build web app + sync to ios/
 npm run ios:open    # open in Xcode
 ```
 
-- **Bundle ID:** `com.collins.lawncare`
-- **Privacy policy template:** [docs/PRIVACY_POLICY.md](./docs/PRIVACY_POLICY.md) (host publicly before submitting)
+- **Bundle ID:** `com.colecollins.turfroute` · URL scheme `turfroute://`
+- **Privacy policy:** [`public/privacy.html`](./public/privacy.html) (deployed at `/privacy.html`)
+- **Static iOS checks (Linux-friendly):** `npm run ios:verify`
 - **Source assets:** `resources/icon.png`, `resources/splash.png`
 
 ## Firebase (project: `lawncare-72560`)
@@ -76,8 +79,9 @@ npm run firebase:deploy:rules
 ## Test
 
 ```bash
-npm test       # unit tests plus Firestore emulator rule tests
+npm test          # unit tests plus Firestore emulator rule tests
 npm run build
+npm run ios:verify  # brand sync + plist/XML/StoreKit/icon checks
 ```
 
 ## Built With

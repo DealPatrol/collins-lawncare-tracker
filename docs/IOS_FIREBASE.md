@@ -6,7 +6,7 @@ When you are ready to add native Firebase (Crashlytics, push, etc.):
 
 ## 1. Download `GoogleService-Info.plist`
 
-**Firebase Console** → Project `lawncare-72560` → Project Settings → Your apps → iOS (`com.collins.lawncare`) → Download `GoogleService-Info.plist`
+**Firebase Console** → Project `lawncare-72560` → Project Settings → Your apps → iOS (`com.colecollins.turfroute` — the TurfRoute bundle ID; register a new iOS app if your existing one uses the old `com.collins.lawncare`) → Download `GoogleService-Info.plist`
 
 Or:
 

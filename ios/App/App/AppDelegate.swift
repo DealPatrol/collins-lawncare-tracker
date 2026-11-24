@@ -5,6 +5,7 @@ import Capacitor
 class AppDelegate: UIResponder, UIApplicationDelegate {
 
     var window: UIWindow?
+    private var privacyCover: UIView?
 
     func application(_ application: UIApplication, didFinishLaunchingWithOptions launchOptions: [UIApplication.LaunchOptionsKey: Any]?) -> Bool {
         // Native Firebase (optional): after adding GoogleService-Info.plist and the Firebase iOS SDK,
@@ -15,8 +16,9 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationWillResignActive(_ application: UIApplication) {
-        // Sent when the application is about to move from active to inactive state. This can occur for certain types of temporary interruptions (such as an incoming phone call or SMS message) or when the user quits the application and it begins the transition to the background state.
-        // Use this method to pause ongoing tasks, disable timers, and invalidate graphics rendering callbacks. Games should use this method to pause the game.
+        // App-switcher privacy cover: iOS snapshots the screen right after this
+        // call, so customer names, addresses and pay never appear in the switcher.
+        showPrivacyCover()
     }
 
     func applicationDidEnterBackground(_ application: UIApplication) {
@@ -29,7 +31,7 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
     }
 
     func applicationDidBecomeActive(_ application: UIApplication) {
-        // Restart any tasks that were paused (or not yet started) while the application was inactive. If the application was previously in the background, optionally refresh the user interface.
+        hidePrivacyCover()
     }
 
     func applicationWillTerminate(_ application: UIApplication) {
@@ -49,4 +51,29 @@ class AppDelegate: UIResponder, UIApplicationDelegate {
         return ApplicationDelegateProxy.shared.application(application, continue: userActivity, restorationHandler: restorationHandler)
     }
 
+    // MARK: - Privacy cover
+
+    private func showPrivacyCover() {
+        guard privacyCover == nil, let window = window else { return }
+        let cover = UIView(frame: window.bounds)
+        cover.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        cover.backgroundColor = UIColor(red: 13 / 255, green: 17 / 255, blue: 23 / 255, alpha: 1)
+
+        let label = UILabel(frame: cover.bounds)
+        label.autoresizingMask = [.flexibleWidth, .flexibleHeight]
+        label.text = Bundle.main.object(forInfoDictionaryKey: "CFBundleDisplayName") as? String ?? "TurfRoute"
+        label.textColor = UIColor(red: 52 / 255, green: 211 / 255, blue: 153 / 255, alpha: 1)
+        label.font = .systemFont(ofSize: 30, weight: .bold)
+        label.textAlignment = .center
+        cover.addSubview(label)
+
+        window.addSubview(cover)
+        privacyCover = cover
+    }
+
+    private func hidePrivacyCover() {
+        guard let cover = privacyCover else { return }
+        privacyCover = nil
+        UIView.animate(withDuration: 0.15, animations: { cover.alpha = 0 }, completion: { _ in cover.removeFromSuperview() })
+    }
 }

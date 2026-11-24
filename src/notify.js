@@ -7,8 +7,9 @@
 // similar) that forwards to Twilio/SMS by Zapier, and this fires the moment
 // a job's timer stops — no tap required.
 
-export function buildCompletionMessage(template, { customer, job, crew }) {
+export function buildCompletionMessage(template, { customer, job, crew, business }) {
   return (template || "")
+    .replaceAll("{business}", (business || "").trim() || "our crew")
     .replaceAll("{customer}", customer || "there")
     .replaceAll("{job}", job || "your yard")
     .replaceAll("{crew}", crew || "the crew");

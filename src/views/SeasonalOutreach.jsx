@@ -3,12 +3,12 @@ import { activeCampaigns, buildUpsellLetter, buildUpsellSms } from "../seasonal.
 import { smsUrl } from "../prospecting.js";
 import { IconCopy, IconExternal, IconSend, IconZap } from "../icons.jsx";
 
-function UpsellSheet({ job, campaign, senderName, bizPhone, onUpdateJob, showToast, onClose }) {
+function UpsellSheet({ job, campaign, senderName, bizPhone, bizName, onUpdateJob, showToast, onClose }) {
   const [mode, setMode] = useState(job.customerPhone ? "text" : "letter");
   const [edited, setEdited] = useState({});
   const [phone, setPhone] = useState(job.customerPhone || "");
 
-  const ctx = { customerName: job.customerName || job.name, address: job.address, senderName, bizPhone };
+  const ctx = { customerName: job.customerName || job.name, address: job.address, senderName, bizPhone, bizName };
   const autoMessage = mode === "text" ? buildUpsellSms(campaign, ctx) : buildUpsellLetter(campaign, ctx);
   const message = edited[mode] ?? autoMessage;
   const setMessage = (text) => setEdited((e) => ({ ...e, [mode]: text }));
@@ -84,7 +84,7 @@ function UpsellSheet({ job, campaign, senderName, bizPhone, onUpdateJob, showToa
   );
 }
 
-export default function SeasonalOpportunity({ jobs, senderName, bizPhone, onUpdateJob, showToast }) {
+export default function SeasonalOpportunity({ jobs, senderName, bizPhone, bizName, onUpdateJob, showToast }) {
   const campaigns = useMemo(() => activeCampaigns(), []);
   const [campaignId, setCampaignId] = useState(campaigns[0]?.id || null);
   const [sheetJobId, setSheetJobId] = useState(null);
@@ -128,7 +128,7 @@ export default function SeasonalOpportunity({ jobs, senderName, bizPhone, onUpda
       ))}
       {sheetJob && (
         <UpsellSheet
-          job={sheetJob} campaign={campaign} senderName={senderName} bizPhone={bizPhone}
+          job={sheetJob} campaign={campaign} senderName={senderName} bizPhone={bizPhone} bizName={bizName}
           onUpdateJob={onUpdateJob} showToast={showToast} onClose={() => setSheetJobId(null)}
         />
       )}

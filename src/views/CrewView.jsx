@@ -3,13 +3,19 @@ import { todaysCrewDays } from "../store.js";
 import {
   formatDuration, formatMiles, formatMoney, formatTime, getWeekKey, lastNDayKeys,
 } from "../utils.js";
-import { IconUsers, IconTrophy, IconPlus, IconTrash, IconCheck, IconCopy, IconExternal, IconSend } from "../icons.jsx";
+import { IconUsers, IconTrophy, IconPlus, IconTrash, IconCheck, IconCopy, IconExternal, IconSend, IconZap } from "../icons.jsx";
+import { BRAND } from "../brand.js";
+import { canShare, shareText } from "../native.js";
+import { usePro } from "../proContext.js";
+import { canAddCrewProfile, canShareCrewInvite } from "../proPolicy.js";
+import ProSheet from "./ProSheet.jsx";
 
-function InviteCrew({ getInviteCode, onJoinCrew, showToast }) {
+function InviteCrew({ getInviteCode, onJoinCrew, showToast, inviteLocked, onLocked }) {
   const [joinCode, setJoinCode] = useState("");
   const [joining, setJoining] = useState(false);
 
   const copyInvite = async () => {
+    if (inviteLocked) { onLocked(); return; }
     const code = getInviteCode();
     try {
       await navigator.clipboard.writeText(code);
@@ -20,10 +26,10 @@ function InviteCrew({ getInviteCode, onJoinCrew, showToast }) {
   };
 
   const shareInvite = async () => {
+    if (inviteLocked) { onLocked(); return; }
     const code = getInviteCode();
-    try {
-      await navigator.share({ text: code, title: "Collins Lawncare crew invite" });
-    } catch { /* user cancelled the share sheet */ }
+    const result = await shareText({ text: code, title: `${BRAND.name} crew invite` });
+    if (result === "copied") showToast("Invite code copied — text or AirDrop it to your crew.");
   };
 
   const join = () => {
@@ -54,8 +60,8 @@ function InviteCrew({ getInviteCode, onJoinCrew, showToast }) {
         Each phone still tracks its own time separately after that.
       </p>
       <div className="stat-grid-2" style={{ marginBottom: 14 }}>
-        <button className="btn btn-primary" onClick={copyInvite}><IconCopy size={15} />Copy Invite Code</button>
-        {typeof navigator.share === "function" && (
+        <button className="btn btn-primary" onClick={copyInvite}>{inviteLocked ? <IconZap size={15} /> : <IconCopy size={15} />}Copy Invite Code</button>
+        {canShare() && (
           <button className="btn btn-ghost" onClick={shareInvite}><IconExternal size={15} />Share</button>
         )}
       </div>
@@ -122,11 +128,20 @@ export default function CrewView({ state, me, onAddEmployee, onRemoveEmployee, o
       .sort((a, b) => b.distance - a.distance || b.jobsDone - a.jobsDone);
   }, [state.employees, stats]);
 
+  const pro = usePro();
+  const [proReason, setProReason] = useState(null);
+  const canAdd = canAddCrewProfile({ crewCount: state.employees.length, isPro: pro.isPro, gatingActive: pro.gatingActive });
+  const inviteLocked = !canShareCrewInvite({ isPro: pro.isPro, gatingActive: pro.gatingActive });
+
   const crewToday = todaysCrewDays(state);
   const anyDistance = ranked.some((e) => e.distance > 0);
 
   const add = () => {
     if (!newName.trim()) return;
+    if (!canAdd) {
+      setProReason(`Adding more crew profiles is part of ${BRAND.pro.name}.`);
+      return;
+    }
     onAddEmployee(newName, newRole);
     setNewName("");
     showToast(`${newName.trim()} added to the crew.`);
@@ -176,7 +191,11 @@ export default function CrewView({ state, me, onAddEmployee, onRemoveEmployee, o
           )}
         </div>
 
-        <InviteCrew getInviteCode={getInviteCode} onJoinCrew={onJoinCrew} showToast={showToast} />
+        <InviteCrew
+          getInviteCode={getInviteCode} onJoinCrew={onJoinCrew} showToast={showToast}
+          inviteLocked={inviteLocked}
+          onLocked={() => setProReason(`Sharing crew invite codes is part of ${BRAND.pro.name}. Joining a crew is always free.`)}
+        />
 
         {/* Live crew status (today) */}
         <div className="card">
@@ -240,10 +259,11 @@ export default function CrewView({ state, me, onAddEmployee, onRemoveEmployee, o
             <button className={`seg-option${newRole === "manager" ? " active" : ""}`} onClick={() => setNewRole("manager")}>Crew Manager</button>
           </div>
           <button className="btn btn-primary btn-block" disabled={!newName.trim()} onClick={add}>
-            <IconPlus size={15} />Add to Crew
+            {canAdd ? <IconPlus size={15} /> : <IconZap size={15} />}Add to Crew
           </button>
         </div>
       </div>
+      {proReason && <ProSheet reason={proReason} onClose={() => setProReason(null)} showToast={showToast} />}
     </>
   );
 }

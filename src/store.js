@@ -1,6 +1,10 @@
 import { getTodayKey } from "./utils.js";
+import { BRAND } from "./brand.js";
 
-// Single-key app state persisted to localStorage. Older releases stored
+// Single-key app state persisted to localStorage. The key names keep their
+// original "collins_*" prefix on purpose: renaming them would strand existing
+// installs' data. They are never shown to users.
+// Older releases stored
 // jobs/workday/home under separate keys — migrate those on first load.
 
 const STATE_KEY = "collins_lawncare_v2";
@@ -8,6 +12,7 @@ const LEGACY_JOBS_KEY = "collins_lawncare_jobs";
 const LEGACY_DAY_KEY = "collins_workday";
 const LEGACY_HOME_KEY = "collins_home";
 const LEGACY_HOME_COORDS_KEY = "collins_home_coords";
+const WEATHER_CACHE_KEY = "collins_weather_cache"; // owned by weather.js
 
 export const EMPLOYEE_COLORS = ["#34d399", "#60a5fa", "#f59e0b", "#f472b6", "#a78bfa", "#22d3ee", "#fb923c", "#facc15"];
 
@@ -22,7 +27,9 @@ export const DEFAULT_SETTINGS = {
   regridToken: "", // parcel-records API key that powers the Prospector
   mileageRate: 0.7, // $/mile for the mileage export — IRS rate changes yearly
   notifyWebhookUrl: "", // fires when a job's timer stops, if the job opts in
-  notifyMessageTemplate: "Hey {customer}, {crew} from Collins Lawncare just finished up at {job}. Thanks for choosing us!",
+  notifyMessageTemplate: "Hey {customer}, {crew} from {business} just finished up at {job}. Thanks for choosing us!",
+  businessName: "", // your company name, used in customer messages (e.g. "Green Acres Lawn Care")
+  businessCity: "", // optional sign-off line, e.g. "Hanceville, AL"
   anthropicApiKey: "", // powers AI satellite yard quoting on Prospector leads
 };
 
@@ -95,7 +102,7 @@ export function saveState(state) {
 // so a different account signing in on this device can't inherit — or upload
 // to its own cloud document — the previous user's private data.
 export function clearState() {
-  [STATE_KEY, LEGACY_JOBS_KEY, LEGACY_DAY_KEY, LEGACY_HOME_KEY, LEGACY_HOME_COORDS_KEY].forEach((key) => {
+  [STATE_KEY, LEGACY_JOBS_KEY, LEGACY_DAY_KEY, LEGACY_HOME_KEY, LEGACY_HOME_COORDS_KEY, WEATHER_CACHE_KEY].forEach((key) => {
     try {
       localStorage.removeItem(key);
     } catch {
@@ -183,7 +190,7 @@ export function makeEmployee(name, role = "crew", existing = []) {
 export function exportBackup(state) {
   return {
     version: 2,
-    app: "collins-lawncare-tracker",
+    app: BRAND.fileSlug,
     exportedAt: new Date().toISOString(),
     ...state,
   };

@@ -1,4 +1,5 @@
 import { loadStripe } from '@stripe/stripe-js';
+import { apiUrl } from './lib/api.js';
 
 // Initialize Stripe (requires VITE_STRIPE_PUBLIC_KEY in .env)
 let stripePromise = null;
@@ -19,7 +20,7 @@ export const getStripe = () => {
 // Firestore so callers cannot alter it.
 export const createPaymentIntent = async ({ jobId, portalToken, idToken } = {}) => {
   try {
-    const response = await fetch('/api/create-payment-intent', {
+    const response = await fetch(apiUrl('/api/create-payment-intent'), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/json',

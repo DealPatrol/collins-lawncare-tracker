@@ -5,6 +5,11 @@ import { formatMoney, getTodayKey } from "../utils.js";
 import {
   buildMileageCsv, buildMileageRows, EXPENSE_CATEGORIES, expenseTotal, mileageTotal,
 } from "../reports.js";
+import { BRAND } from "../brand.js";
+import { exportTextFile } from "../native.js";
+import { usePro } from "../proContext.js";
+import ProSheet from "./ProSheet.jsx";
+import DeleteAccountSheet from "./DeleteAccountSheet.jsx";
 import {
   IconPin, IconDownload, IconUpload, IconTarget, IconSearch, IconSend, IconDollar, IconRoute, IconTrash, IconPlus, IconZap,
 } from "../icons.jsx";
@@ -38,9 +43,14 @@ function Toggle({ checked, onChange }) {
 
 export default function SettingsView({
   state, me, onUpdateSettings, onRestore, onSwitchEmployee, onAddExpense, onDeleteExpense, showToast,
-  firebaseEnabled, user, syncing, syncError, cloudActive, onLogout,
+  firebaseEnabled, user, syncing, syncError, cloudActive, onLogout, onDeleteAccount, openPro = false,
 }) {
   const { settings } = state;
+  const pro = usePro();
+  const [showPro, setShowPro] = useState(openPro && pro.gatingActive);
+  const [showDelete, setShowDelete] = useState(false);
+  const [businessName, setBusinessName] = useState(settings.businessName || "");
+  const [businessCity, setBusinessCity] = useState(settings.businessCity || "");
   const importRef = useRef(null);
   const [homeAddress, setHomeAddress] = useState(settings.homeAddress);
   const [regridToken, setRegridToken] = useState(settings.regridToken || "");
@@ -68,15 +78,19 @@ export default function SettingsView({
     }
   };
 
-  const doExport = () => {
-    const blob = new Blob([JSON.stringify(exportBackup(state), null, 2)], { type: "application/json" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `collins-lawncare-backup-${getTodayKey()}.json`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("Backup downloaded.");
+  const doExport = async () => {
+    try {
+      const result = await exportTextFile({
+        filename: `${BRAND.fileSlug}-backup-${getTodayKey()}.json`,
+        contents: JSON.stringify(exportBackup(state), null, 2),
+        mimeType: "application/json",
+        title: `${BRAND.name} backup`,
+      });
+      if (result === "downloaded") showToast("Backup downloaded.");
+      else if (result === "shared") showToast("Backup exported.");
+    } catch {
+      showToast("Could not export the backup.", "red");
+    }
   };
 
   const doImport = (file) => {
@@ -98,14 +112,15 @@ export default function SettingsView({
       return;
     }
     const csv = buildMileageCsv(mileageRows, rate);
-    const blob = new Blob([csv], { type: "text/csv" });
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = `collins-lawncare-mileage-${getTodayKey()}.csv`;
-    a.click();
-    URL.revokeObjectURL(url);
-    showToast("Mileage log downloaded.");
+    exportTextFile({
+      filename: `${BRAND.fileSlug}-mileage-${getTodayKey()}.csv`,
+      contents: csv,
+      mimeType: "text/csv",
+      title: "Mileage log",
+    }).then((result) => {
+      if (result === "downloaded") showToast("Mileage log downloaded.");
+      else if (result === "shared") showToast("Mileage log exported.");
+    }).catch(() => showToast("Could not export the mileage log.", "red"));
   };
 
   const saveExpense = () => {
@@ -144,8 +159,61 @@ export default function SettingsView({
             <button className="btn btn-ghost btn-block" onClick={() => onLogout()}>
               Sign Out
             </button>
+            <button
+              className="btn btn-ghost btn-block"
+              style={{ color: "var(--red)", marginTop: 8 }}
+              onClick={() => setShowDelete(true)}
+            >
+              <IconTrash size={15} />Delete Account
+            </button>
           </div>
         )}
+
+        {pro.gatingActive && (
+          <div className="card">
+            <div className="section-title"><IconZap size={13} style={{ verticalAlign: -2, marginRight: 5 }} />{BRAND.pro.name}</div>
+            <p className="text-dim" style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
+              {pro.isPro
+                ? `Active — thanks for supporting ${BRAND.name}.`
+                : `Run a whole crew from one phone: ${BRAND.pro.features.join(", ").toLowerCase()}.`}
+            </p>
+            {pro.isPro ? (
+              <button className="btn btn-ghost btn-block" onClick={pro.manage}>Manage Subscription</button>
+            ) : (
+              <div className="stat-grid-2">
+                <button className="btn btn-primary" onClick={() => setShowPro(true)}>See Plans</button>
+                <button className="btn btn-ghost" disabled={pro.busy} onClick={async () => {
+                  const { isPro } = await pro.restore();
+                  showToast(isPro ? `${BRAND.pro.name} restored.` : "No active subscription found for this Apple ID.", isPro ? "green" : "amber");
+                }}>Restore Purchases</button>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* Business */}
+        <div className="card">
+          <div className="section-title">Your Business</div>
+          <p className="text-dim" style={{ fontSize: 12.5, marginBottom: 12, lineHeight: 1.5 }}>
+            Used in customer texts, letters and job-done messages.
+          </p>
+          <label className="field-label" htmlFor="biz-name">Business name</label>
+          <input
+            id="biz-name" className="input" placeholder="e.g. Green Acres Lawn Care"
+            value={businessName} onChange={(e) => setBusinessName(e.target.value)}
+          />
+          <label className="field-label" htmlFor="biz-city">City (optional sign-off)</label>
+          <input
+            id="biz-city" className="input" placeholder="e.g. Hanceville, AL"
+            value={businessCity} onChange={(e) => setBusinessCity(e.target.value)}
+          />
+          <button
+            className="btn btn-ghost btn-block"
+            onClick={() => { onUpdateSettings({ businessName: businessName.trim(), businessCity: businessCity.trim() }); showToast("Business details saved."); }}
+          >
+            Save Business Details
+          </button>
+        </div>
 
         {/* Profile */}
         <div className="card">
@@ -307,7 +375,7 @@ export default function SettingsView({
             value={msgTemplate} onChange={(e) => setMsgTemplate(e.target.value)}
           />
           <p className="text-faint" style={{ fontSize: 11, marginBottom: 10 }}>
-            Placeholders: {"{customer}"} {"{job}"} {"{crew}"}
+            Placeholders: {"{customer}"} {"{job}"} {"{crew}"} {"{business}"}
           </p>
           <button
             className="btn btn-ghost btn-block"
@@ -414,9 +482,15 @@ export default function SettingsView({
         </div>
 
         <p className="text-faint" style={{ fontSize: 11.5, textAlign: "center", paddingBottom: 8 }}>
-          Collins Lawncare Tracker · v2.0
+          {BRAND.name} · v2.0 ·{" "}
+          <a className="link-btn text-faint" style={{ fontSize: 11.5 }} href={BRAND.privacyPolicyUrl} target="_blank" rel="noreferrer">Privacy Policy</a>
         </p>
       </div>
+
+      {showPro && <ProSheet onClose={() => setShowPro(false)} showToast={showToast} />}
+      {showDelete && user && (
+        <DeleteAccountSheet email={user.email} onDelete={onDeleteAccount} onClose={() => setShowDelete(false)} />
+      )}
     </>
   );
 }

@@ -1,5 +1,6 @@
 import { useState } from "react";
 import { styles } from "./styles.js";
+import { BRAND } from "./brand.js";
 
 export default function Login({ onLogin, onSignup }) {
   const [mode, setMode] = useState("signin");
@@ -26,7 +27,7 @@ export default function Login({ onLogin, onSignup }) {
     <div style={styles.page}>
       <div style={{ padding: "48px 24px 24px", textAlign: "center" }}>
         <div style={{ fontSize: 48, marginBottom: 12 }}>🌿</div>
-        <div style={styles.brand}>Collins Lawncare</div>
+        <div style={styles.brand}>{BRAND.name}</div>
         <div style={{ ...styles.subBrand, marginTop: 4 }}>Sign in to sync your data</div>
       </div>
 
@@ -64,6 +65,10 @@ export default function Login({ onLogin, onSignup }) {
         >
           {mode === "signin" ? "Need an account? Sign up" : "Already have an account? Sign in"}
         </button>
+        <p style={{ fontSize: 11.5, color: "#94a3b8", textAlign: "center", marginTop: 14, lineHeight: 1.5 }}>
+          You can delete your account any time in Settings → Account.{" "}
+          <a href={BRAND.privacyPolicyUrl} target="_blank" rel="noreferrer" style={{ color: "#60a5fa" }}>Privacy Policy</a>
+        </p>
       </form>
     </div>
   );

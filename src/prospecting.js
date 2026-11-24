@@ -10,6 +10,7 @@
 // to looked-up numbers violate the TCPA at $500–$1,500 per message).
 
 import { haversineMeters } from "./utils.js";
+import { BRAND } from "./brand.js";
 
 const REGRID_POINT_URL = "https://app.regrid.com/api/v2/parcels/point";
 
@@ -112,7 +113,17 @@ export function ownerRecordsUrl(address, city) {
 }
 
 // ── Outreach messages ─────────────────────────────────────────
-// ctx: { owner, address, yardCount, senderName, bizPhone }
+// ctx: { owner, address, yardCount, senderName, bizPhone, bizName, bizCity }
+
+function businessLabel(ctx) {
+  return (ctx.bizName || "").trim() || BRAND.defaultBusinessLabel;
+}
+
+function signatureLine(ctx) {
+  const name = (ctx.bizName || "").trim();
+  const city = (ctx.bizCity || "").trim();
+  return [name, city].filter(Boolean).join(" · ");
+}
 
 function firstName(sender) {
   return (sender || "").trim().split(/\s+/)[0] || "the crew";
@@ -121,7 +132,7 @@ function firstName(sender) {
 export function buildSmsMessage(ctx) {
   const reply = ctx.bizPhone ? ` or call/text ${ctx.bizPhone}` : "";
   return (
-    `Hi, this is ${firstName(ctx.senderName)} with Collins Lawncare. ` +
+    `Hi, this is ${firstName(ctx.senderName)} with ${businessLabel(ctx)}. ` +
     `We already mow ${ctx.yardCount} yard${ctx.yardCount === 1 ? "" : "s"} every week right near ${ctx.address || "your place"}, ` +
     `so we can offer you a better rate than anyone driving out special — dependable weekly mowing, trimming, and edging. ` +
     `Want a free quote? Just reply${reply}. Thanks!`
@@ -138,8 +149,8 @@ export function buildLetterMessage(ctx) {
     `who has to drive out special: dependable weekly mowing, trimming, and edging, with year-round monthly plans that ` +
     `cover leaves and cleanup too.\n\n` +
     `If you'd like a free, no-pressure quote for ${ctx.address || "your place"}, ${phone}.\n\n` +
-    `${ctx.senderName || "The crew"}\n` +
-    `Collins Lawncare · Hanceville, AL`
+    `${ctx.senderName || "The crew"}` +
+    (signatureLine(ctx) ? `\n${signatureLine(ctx)}` : "")
   );
 }
 

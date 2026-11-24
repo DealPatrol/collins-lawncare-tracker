@@ -4,9 +4,14 @@ import {
   signInWithEmailAndPassword,
   createUserWithEmailAndPassword,
   signOut,
+  EmailAuthProvider,
+  reauthenticateWithCredential,
+  deleteUser,
 } from "firebase/auth";
-import { auth, getFirebaseAuth, isFirebaseConfigured } from "./firebase.js";
+import { deleteDoc, doc } from "firebase/firestore";
+import { auth, db, getFirebaseAuth, isFirebaseConfigured } from "./firebase.js";
 import { AuthContext } from "./authContext.js";
+import { deleteAccount as runDeleteAccount } from "./accountDeletion.js";
 
 export function AuthProvider({ children }) {
   const firebaseEnabled = isFirebaseConfigured();
@@ -29,6 +34,28 @@ export function AuthProvider({ children }) {
 
   const logout = () => signOut(getFirebaseAuth());
 
+  /**
+   * Permanently delete the signed-in account and its cloud data.
+   * Resolves { status: "deleted" | "needs-password" }; throws
+   * AccountDeletionError with a user-facing message on failure.
+   */
+  const deleteAccount = ({ password, clearLocal } = {}) => {
+    const current = getFirebaseAuth()?.currentUser;
+    if (!current) return Promise.reject(new Error("Not signed in"));
+    return runDeleteAccount({
+      password,
+      deps: {
+        getAuthTime: async () => (await current.getIdTokenResult()).authTime,
+        reauthenticate: (pw) =>
+          reauthenticateWithCredential(current, EmailAuthProvider.credential(current.email, pw)),
+        // Firestore rules already allow the owner to delete users/{uid}/data/app.
+        deleteCloudData: () => (db ? deleteDoc(doc(db, "users", current.uid, "data", "app")) : Promise.resolve()),
+        deleteAuthUser: () => deleteUser(current),
+        clearLocal: () => clearLocal?.(),
+      },
+    });
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -37,6 +64,7 @@ export function AuthProvider({ children }) {
         login,
         signup,
         logout,
+        deleteAccount,
         firebaseEnabled,
       }}
     >
