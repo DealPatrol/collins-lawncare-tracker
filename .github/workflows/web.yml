@@ -1,0 +1,27 @@
+# Lint/tests/web build already run in ci.yml. This workflow adds the iOS
+# App Store static checks (brand config, plist/StoreKit/PrivacyInfo validation)
+# so native config drift is caught on every PR without paying for macOS minutes.
+name: Web + iOS static checks
+on:
+  pull_request:
+  push:
+    branches: [main]
+jobs:
+  ios-static:
+    runs-on: ubuntu-latest
+    permissions:
+      contents: read
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+      - uses: actions/setup-python@v5
+        with:
+          python-version: '3.12'
+      - run: npm ci
+      - run: npm run brand:check
+      - run: npm run build
+      - run: npx cap sync ios
+      - run: npm run ios:verify
