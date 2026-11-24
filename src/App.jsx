@@ -1,4 +1,7 @@
 import { useCallback, useEffect, useRef, useState } from "react";
+import { App as CapacitorApp } from "@capacitor/app";
+import { isNative, notifyHaptic } from "./native.js";
+import { parseDeepLink } from "./deepLinks.js";
 import { useAuth } from "./useAuth.js";
 import Login from "./Login.jsx";
 import { useFirestoreSync } from "./useFirestoreSync.js";
@@ -31,7 +34,7 @@ const TABS = [
 ];
 
 export default function App() {
-  const { user, loading, login, signup, logout, firebaseEnabled } = useAuth();
+  const { user, loading, login, signup, logout, deleteAccount, firebaseEnabled } = useAuth();
 
   if (firebaseEnabled && loading) {
     return (
@@ -50,12 +53,13 @@ export default function App() {
       key={user?.uid ?? "local"}
       user={user}
       logout={logout}
+      deleteAccount={deleteAccount}
       firebaseEnabled={firebaseEnabled}
     />
   );
 }
 
-function LawncareApp({ user, logout, firebaseEnabled }) {
+function LawncareApp({ user, logout, deleteAccount, firebaseEnabled }) {
   const [state, setState] = useState(loadState);
   const [tab, setTab] = useState("today");
   // subview: null | { kind: "detail", jobId } | { kind: "form", jobId? }
@@ -65,14 +69,50 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
 
   useEffect(() => saveState(state), [state]);
 
-  const { syncing, syncError, cloudActive } = useFirestoreSync(user, state, setState);
+  const [openPro, setOpenPro] = useState(false);
+  const [settingsKey, setSettingsKey] = useState(0);
+  const { syncing, syncError, cloudActive, pauseSync, resumeSync } = useFirestoreSync(user, state, setState);
+
+  // turfroute:// deep links (native only) — navigation only, never actions.
+  useEffect(() => {
+    if (!isNative()) return undefined;
+    const sub = CapacitorApp.addListener("appUrlOpen", ({ url }) => {
+      const link = parseDeepLink(url);
+      if (!link) return;
+      setSubview(null);
+      setTab(link.tab);
+      if (link.pro) {
+        setOpenPro(true);
+        setSettingsKey((k) => k + 1);
+      }
+    });
+    return () => { sub.then((h) => h.remove()).catch(() => {}); };
+  }, []);
 
   // Clear locally cached app data before signing out so a different account
   // signing in on this device does not inherit (or upload to its own cloud
   // document) the previous user's private data.
   const handleLogout = async () => {
+    // Stop sync first (without waiting on the network, so sign-out works
+    // offline) so no debounced save can re-upload after the local wipe.
+    await pauseSync({ drain: false });
     clearState();
-    await logout();
+    try { await logout(); } catch (err) { resumeSync(); throw err; }
+  };
+
+  // Guideline 5.1.1(v) in-app account deletion. Resolves
+  // { status: "deleted" | "needs-password" }; throws a friendly error.
+  const handleDeleteAccount = async ({ password } = {}) => {
+    if (!navigator.onLine) throw new Error("Connect to the internet before deleting your account.");
+    await pauseSync();
+    try {
+      const result = await deleteAccount({ password, clearLocal: clearState });
+      if (result.status !== "deleted") resumeSync();
+      return result;
+    } catch (err) {
+      resumeSync();
+      throw err;
+    }
   };
 
   const me = state.employees.find((e) => e.id === state.activeEmployeeId) || null;
@@ -267,7 +307,7 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
       return next;
     });
     if (auto) {
-      if (navigator.vibrate) navigator.vibrate([120, 60, 120]);
+      notifyHaptic("warning", [120, 60, 120]);
       showToast("Left the job site — timer stopped and visit saved automatically.");
     }
     // Only text the customer if a session was actually running and stopped —
@@ -282,6 +322,7 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
           customer: jobBefore.customerName || null,
           job: jobBefore.name,
           crew: crewName,
+          business: state.settings.businessName,
         }),
         job: jobBefore.name,
         address: jobBefore.address || "",
@@ -306,7 +347,7 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
 
   const onAutoStop = (job) => stopTimer(job.id, { auto: true });
   const onArrive = (job) => {
-    if (navigator.vibrate) navigator.vibrate(80);
+    notifyHaptic("success", 80);
     startTimer(job.id);
     showToast(`Arrived at ${job.name} — timer started automatically.`);
   };
@@ -421,6 +462,8 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
     if (tab === "settings") {
       return (
         <SettingsView
+          key={settingsKey}
+          openPro={openPro}
           {...shared}
           firebaseEnabled={firebaseEnabled}
           user={user}
@@ -428,6 +471,7 @@ function LawncareApp({ user, logout, firebaseEnabled }) {
           syncError={syncError}
           cloudActive={cloudActive}
           onLogout={handleLogout}
+          onDeleteAccount={handleDeleteAccount}
           onUpdateSettings={updateSettings}
           onRestore={restoreState}
           onSwitchEmployee={switchEmployee}

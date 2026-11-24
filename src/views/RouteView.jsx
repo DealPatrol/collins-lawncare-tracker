@@ -5,6 +5,8 @@ import {
 } from "../utils.js";
 import { IconHome, IconMap, IconExternal, IconPin, IconAlert, IconRoute } from "../icons.jsx";
 import GrowthView from "./GrowthView.jsx";
+import { BRAND } from "../brand.js";
+import { isNative, shareText } from "../native.js";
 
 const DEFAULT_CENTER = { lat: 34.0632, lng: -86.7686 };
 const DEFAULT_JOB_SEC = 45 * 60; // planning estimate for yards with no history
@@ -57,6 +59,15 @@ export default function RouteView(props) {
     mapsUrl = `https://www.google.com/maps/dir/?api=1&origin=${encodeURIComponent(originStr)}&destination=${encodeURIComponent(destStr)}&waypoints=${waypoints}&travelmode=driving`;
   }
 
+  const shareRoute = async () => {
+    const lines = plan.stops.map(({ job }, i) => `${i + 1}. ${job.name}${job.address ? ` — ${job.address}` : ""}`);
+    await shareText({
+      title: `${BRAND.name} — today's route`,
+      text: [`Today's route (${lines.length} stops)`, ...lines, `Total: ${formatMiles(totalDriveM)} driving · ${formatMoney(totalPay)} scheduled`].join("\n"),
+      url: mapsUrl || undefined,
+    });
+  };
+
   // OSM embed bounding box over all pins.
   const pts = [];
   if (settings.homeCoords) pts.push(settings.homeCoords);
@@ -76,9 +87,16 @@ export default function RouteView(props) {
       <div className="header">
         <h1 className="header-title">{mode === "plan" ? "Route Planner" : "Growth Zones"}</h1>
         {mode === "plan" && mapsUrl && (
-          <a className="btn btn-blue btn-sm" href={mapsUrl} target="_blank" rel="noreferrer">
-            <IconExternal size={14} />Google Maps
-          </a>
+          <div style={{ display: "flex", gap: 6 }}>
+            {isNative() && (
+              <button className="btn btn-ghost btn-sm" onClick={shareRoute} aria-label="Share route">
+                <IconRoute size={14} />Share
+              </button>
+            )}
+            <a className="btn btn-blue btn-sm" href={mapsUrl} target="_blank" rel="noreferrer">
+              <IconExternal size={14} />Maps
+            </a>
+          </div>
         )}
       </div>
 

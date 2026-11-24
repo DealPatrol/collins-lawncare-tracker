@@ -6,10 +6,10 @@
   "scripts": {
     "dev": "vite",
     "build": "vite build",
-    "build:ios": "vite build && cap sync ios",
+    "build:ios": "npm run brand:check && vite build && cap sync ios",
     "ios:open": "cap open ios",
     "ios:sync": "cap sync ios",
-    "assets:generate": "capacitor-assets generate --ios",
+    "assets:generate": "capacitor-assets generate --ios --iconBackgroundColor \"#102e20\" --splashBackgroundColor \"#0d1117\"",
     "firebase:keys": "./scripts/fetch-firebase-keys.sh",
     "firebase:env": "node scripts/sync-firebase-env.js",
     "firebase:deploy:rules": "npx -y firebase-tools@latest deploy --only firestore:rules --project lawncare-72560",
@@ -18,14 +18,20 @@
     "firebase:check": "node check-firebase.js",
     "test": "npm run test:unit && npm run test:rules",
     "test:unit": "vitest run --exclude tests/firestore.rules.test.js",
-    "test:rules": "firebase emulators:exec --only firestore --project demo-collins-lawncare \"vitest run tests/firestore.rules.test.js\""
+    "test:rules": "firebase emulators:exec --only firestore --project demo-collins-lawncare \"vitest run tests/firestore.rules.test.js\"",
+    "brand:apply": "node scripts/brand.mjs apply",
+    "brand:check": "node scripts/brand.mjs check",
+    "ios:verify": "npm run brand:check && python3 scripts/verify_ios.py"
   },
   "dependencies": {
     "@capacitor/app": "^8.1.0",
     "@capacitor/cli": "^8.4.1",
     "@capacitor/core": "^8.4.1",
+    "@capacitor/filesystem": "^8.1.5",
     "@capacitor/geolocation": "^8.2.0",
+    "@capacitor/haptics": "^8.0.2",
     "@capacitor/ios": "^8.4.1",
+    "@capacitor/share": "^8.0.3",
     "@capacitor/splash-screen": "^8.0.1",
     "@capacitor/status-bar": "^8.0.2",
     "@sendgrid/mail": "^8.1.6",
@@ -51,5 +57,5 @@
     "vite": "^8.0.12",
     "vitest": "^5.0.2"
   },
-  "description": "Lawncare schedule and pay efficiency tracker"
+  "description": "TurfRoute: lawn-care crew routes, GPS time tracking and pay (web + native iOS via Capacitor)"
 }

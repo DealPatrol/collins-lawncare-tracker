@@ -1,3 +1,4 @@
+import { BRAND } from "./brand.js";
 // ── Seasonal upsell reminders ────────────────────────────────────
 // Existing customers are the cheapest revenue there is — no lead cost, no
 // new-customer trust to build. This surfaces the right seasonal add-on to
@@ -53,16 +54,16 @@ function firstName(name) {
   return (name || "").trim().split(/\s+/)[0] || "";
 }
 
-export function buildUpsellSms(campaign, { customerName, senderName, bizPhone } = {}) {
+export function buildUpsellSms(campaign, { customerName, senderName, bizPhone, bizName } = {}) {
   const greeting = customerName ? `Hi ${firstName(customerName)}` : "Hi";
   const reply = bizPhone ? ` or call/text ${bizPhone}` : "";
   return (
-    `${greeting}, ${firstName(senderName) || "the crew"} with Collins Lawncare here — this time of year we're booking ` +
+    `${greeting}, ${firstName(senderName) || "the crew"} with ${(bizName || "").trim() || BRAND.defaultBusinessLabel} here — this time of year we're booking ` +
     `${campaign.pitch}. Want us to add it to your next visit? Just reply${reply}. Thanks!`
   );
 }
 
-export function buildUpsellLetter(campaign, { customerName, address, senderName, bizPhone } = {}) {
+export function buildUpsellLetter(campaign, { customerName, address, senderName, bizPhone, bizName } = {}) {
   const dear = customerName ? `Hi ${customerName},` : "Hi,";
   const phone = bizPhone ? `call or text me at ${bizPhone}` : "let me know next time we're out";
   return (
@@ -70,7 +71,7 @@ export function buildUpsellLetter(campaign, { customerName, address, senderName,
     `This time of year we're booking ${campaign.pitch} for our regular customers${address ? ` in your area` : ""}. ` +
     `Since we're already taking care of your yard, adding it on is easy and priced fair.\n\n` +
     `Want it added to your next visit? Just ${phone}.\n\n` +
-    `${senderName || "The crew"}\n` +
-    `Collins Lawncare`
+    `${senderName || "The crew"}` +
+    ((bizName || "").trim() ? `\n${bizName.trim()}` : "")
   );
 }

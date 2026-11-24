@@ -5,7 +5,10 @@ import App from './App.jsx'
 import ClientPortal from './views/ClientPortal.jsx'
 import { AuthProvider } from './AuthProvider.jsx'
 import { initCapacitor } from './capacitorInit.js'
+import { ProProvider } from './ProProvider.jsx'
+import { BRAND } from './brand.js'
 
+document.title = BRAND.name
 initCapacitor()
 
 const path = window.location.pathname
@@ -22,9 +25,11 @@ if (isPortal) {
 } else {
   root.render(
     <StrictMode>
-      <AuthProvider>
-        <App />
-      </AuthProvider>
+      <ProProvider>
+        <AuthProvider>
+          <App />
+        </AuthProvider>
+      </ProProvider>
     </StrictMode>,
   )
 }

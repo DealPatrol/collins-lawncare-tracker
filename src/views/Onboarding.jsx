@@ -1,3 +1,4 @@
+import { BRAND } from "../brand.js";
 import { useState } from "react";
 import { IconLeaf, IconUsers } from "../icons.jsx";
 
@@ -37,8 +38,8 @@ export default function Onboarding({ employees, onCreate, onPick, onJoinCrew }) 
           <div className="brand-mark" style={{ width: 64, height: 64, borderRadius: 18, margin: "0 auto 16px" }}>
             <IconLeaf size={34} />
           </div>
-          <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>Collins Lawncare</h1>
-          <p className="text-dim" style={{ fontSize: 14, marginTop: 6 }}>Crew tracking, routes & pay — built for the field.</p>
+          <h1 style={{ fontSize: 24, fontWeight: 800, letterSpacing: "-0.02em" }}>{BRAND.name}</h1>
+          <p className="text-dim" style={{ fontSize: 14, marginTop: 6 }}>{BRAND.tagline}</p>
         </div>
 
         {joinMsg && (
@@ -85,7 +86,7 @@ export default function Onboarding({ employees, onCreate, onPick, onJoinCrew }) 
         <div className="card">
           <div className="section-title">{employees.length ? "Or add a new profile" : "Set up your profile"}</div>
           <label className="field-label">Your name</label>
-          <input className="input" placeholder="e.g. Cole Collins" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
+          <input className="input" placeholder="e.g. Alex Rivera" value={name} onChange={(e) => setName(e.target.value)} onKeyDown={(e) => e.key === "Enter" && create()} />
           <label className="field-label">Role</label>
           <div className="seg-control">
             <button className={`seg-option${role === "crew" ? " active" : ""}`} onClick={() => setRole("crew")}>Crew Member</button>

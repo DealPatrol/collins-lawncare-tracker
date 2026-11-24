@@ -15,7 +15,7 @@ use separate test and production credentials.
 | `VITE_FIREBASE_MESSAGING_SENDER_ID` | Firebase messaging sender ID |
 | `VITE_FIREBASE_APP_ID` | Firebase web app ID |
 | `VITE_FIREBASE_MEASUREMENT_ID` | Optional Analytics measurement ID |
-| `VITE_API_BASE_URL` | API origin for Capacitor or split deployments; empty for same-origin |
+| `VITE_API_BASE_URL` | API origin for split deployments; empty = same origin on the web. The native iOS app falls back to `BRAND.webOrigin` from `src/brand.js` when this is empty |
 | `VITE_STRIPE_PUBLIC_KEY` | Stripe publishable key (`pk_test_…` or `pk_live_…`) |
 
 `VITE_*` values are bundled into the client. Never put a secret key in one.
@@ -31,6 +31,8 @@ use separate test and production credentials.
 | `FIREBASE_SERVICE_ACCOUNT` | Firestore access from server APIs | Complete service-account JSON serialized on one line |
 | `PORTAL_TOKEN_SECRET` | HMAC signing for customer portal links | At least 32 random bytes; changing it revokes existing links |
 | `APP_URL` | Absolute customer portal links | Public app origin, for example `https://app.example.com` |
+| `BUSINESS_NAME` | Company name on customer emails | e.g. `Collins Lawncare`; defaults to the product brand `TurfRoute` |
+| `CORS_ALLOWED_ORIGINS` | Extra origins allowed to call `/api` | Comma-separated; `capacitor://localhost` (iOS app) is always allowed |
 
 `GOOGLE_APPLICATION_CREDENTIALS` may replace `FIREBASE_SERVICE_ACCOUNT` on a
 trusted server with a mounted credentials file, but it is not suitable for
@@ -56,3 +58,10 @@ npm run lint
 npm test
 npm run build
 ```
+
+## Local emulator testing
+
+Set `VITE_USE_FIREBASE_EMULATORS=true` (local builds only) to point Auth at
+`127.0.0.1:9099` and Firestore at `127.0.0.1:8080`. This is how the in-app
+account deletion flow (sign up → Settings → Delete Account → user + `users/{uid}/data/app`
+removed) was tested end-to-end without touching the `lawncare-72560` project.

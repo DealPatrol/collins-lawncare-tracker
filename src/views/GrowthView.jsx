@@ -206,7 +206,7 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
           </div>
         </div>
         <SeasonalOpportunity
-          jobs={jobs} senderName={senderName} bizPhone={settings.bizPhone}
+          jobs={jobs} senderName={senderName} bizPhone={settings.bizPhone} bizName={settings.businessName}
           onUpdateJob={onUpdateJob} showToast={showToast}
         />
       </>
@@ -216,7 +216,7 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
   return (
     <>
       <SeasonalOpportunity
-        jobs={jobs} senderName={senderName} bizPhone={settings.bizPhone}
+        jobs={jobs} senderName={senderName} bizPhone={settings.bizPhone} bizName={settings.businessName}
         onUpdateJob={onUpdateJob} showToast={showToast}
       />
       <div className="stat-grid" style={{ marginBottom: 12 }}>
@@ -366,6 +366,7 @@ export default function GrowthView({ state, openJob, onAddProspect, onUpdatePros
             yardCount={zone ? zone.jobs.length : jobs.length}
             senderName={senderName}
             bizPhone={settings.bizPhone}
+            bizName={settings.businessName}
             onUpdate={onUpdateProspect}
             showToast={showToast}
             onClose={() => setOutreachId(null)}

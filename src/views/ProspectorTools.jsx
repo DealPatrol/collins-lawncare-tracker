@@ -4,6 +4,7 @@ import {
   formatValueShort, mailtoUrl, ownerRecordsUrl, rankParcels, smsUrl,
 } from "../prospecting.js";
 import { formatMiles } from "../utils.js";
+import { canShare, shareText } from "../native.js";
 import {
   IconAlert, IconCopy, IconExternal, IconMail, IconPhone, IconPlus, IconSearch, IconSend,
 } from "../icons.jsx";
@@ -154,7 +155,7 @@ const MODES = [
   { id: "email", label: "Email" },
 ];
 
-export function OutreachSheet({ prospect, yardCount, senderName, bizPhone, onUpdate, showToast, onClose }) {
+export function OutreachSheet({ prospect, yardCount, senderName, bizPhone, bizName, onUpdate, showToast, onClose }) {
   const [mode, setMode] = useState("letter");
   const [edited, setEdited] = useState({}); // per-mode user edits
   // Leads saved before the Prospector shipped are missing the contact fields.
@@ -167,7 +168,8 @@ export function OutreachSheet({ prospect, yardCount, senderName, bizPhone, onUpd
     yardCount: Math.max(yardCount, 1),
     senderName,
     bizPhone,
-  }), [prospect.owner, prospect.address, prospect.name, yardCount, senderName, bizPhone]);
+    bizName,
+  }), [prospect.owner, prospect.address, prospect.name, yardCount, senderName, bizPhone, bizName]);
 
   const autoMessage = mode === "text" ? buildSmsMessage(ctx) : buildLetterMessage(ctx);
   const message = edited[mode] ?? autoMessage;
@@ -186,10 +188,8 @@ export function OutreachSheet({ prospect, yardCount, senderName, bizPhone, onUpd
   };
 
   const share = async () => {
-    try {
-      await navigator.share({ text: message });
-      markContacted();
-    } catch { /* user cancelled the share sheet */ }
+    const result = await shareText({ text: message });
+    if (result === "shared" || result === "copied") markContacted();
   };
 
   const send = () => {
@@ -283,7 +283,7 @@ export function OutreachSheet({ prospect, yardCount, senderName, bizPhone, onUpd
 
         <div style={{ display: "flex", gap: 8, marginTop: 6 }}>
           <button className="btn btn-ghost btn-sm" onClick={copy}><IconCopy size={14} />Copy</button>
-          {typeof navigator.share === "function" && (
+          {canShare() && (
             <button className="btn btn-ghost btn-sm" onClick={share}><IconExternal size={14} />Share</button>
           )}
           {mode === "letter" ? (

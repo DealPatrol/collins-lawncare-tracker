@@ -1,8 +1,10 @@
+import { applyCors } from '../lib/cors.js';
 import { verifyFirebaseIdToken } from '../lib/firebase-admin.js';
 import { loadJobForPortal } from '../lib/portal-data.js';
 import { buildPortalUrl, signPortalToken } from '../lib/portal-token.js';
 
 export default async function handler(req, res) {
+  if (applyCors(req, res, { methods: 'POST, OPTIONS' })) return;
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }

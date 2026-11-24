@@ -1,3 +1,4 @@
+import { BRAND } from "../brand.js";
 import { useEffect, useMemo, useState } from "react";
 import {
   formatClock, formatDuration, formatMiles, formatMoney, formatTime,
@@ -75,7 +76,7 @@ export default function TodayView({
         <div className="brand-row">
           <div className="brand-mark"><IconLeaf size={20} /></div>
           <div>
-            <div className="brand-name">Collins Lawncare</div>
+            <div className="brand-name">{BRAND.name}</div>
             <div className="brand-sub">{new Date().toLocaleDateString([], { weekday: "long", month: "long", day: "numeric" })}</div>
           </div>
         </div>

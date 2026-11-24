@@ -1,8 +1,12 @@
+import { applyCors } from '../lib/cors.js';
+import { businessName, fromEmail } from '../lib/business.js';
 import sgMail from '@sendgrid/mail';
 
 sgMail.setApiKey(process.env.SENDGRID_API_KEY);
 
 export default async function handler(req, res) {
+  if (applyCors(req, res, { methods: 'POST, OPTIONS' })) return;
+  const bizName = businessName();
   if (req.method !== 'POST') {
     return res.status(405).json({ error: 'Method not allowed' });
   }
@@ -17,7 +21,7 @@ export default async function handler(req, res) {
   try {
     const invoiceHTML = `
       <div style="font-family: system-ui, -apple-system, sans-serif; max-width: 600px; margin: 0 auto;">
-        <h1 style="color: #22c55e; text-align: center;">Collins Lawncare</h1>
+        <h1 style="color: #22c55e; text-align: center;">${bizName}</h1>
         
         <div style="background: #f8fafb; padding: 24px; border-radius: 8px; margin: 20px 0;">
           <h2 style="margin-top: 0;">Invoice for ${jobName}</h2>
@@ -47,21 +51,21 @@ export default async function handler(req, res) {
     ? `<a href="${portalLink}" style="background: #22c55e; color: white; padding: 12px 24px; border-radius: 6px; text-decoration: none; font-weight: 700; display: inline-block;">
               View Job & Pay Invoice
             </a>`
-    : `<p style="color: #64748b; font-size: 14px;">Contact Collins Lawncare to view your invoice and pay online.</p>`}
+    : `<p style="color: #64748b; font-size: 14px;">Contact ${bizName} to view your invoice and pay online.</p>`}
           </div>
         </div>
         
         <div style="color: #64748b; font-size: 12px; text-align: center; margin-top: 24px; border-top: 1px solid #e2e8f0; padding-top: 16px;">
-          <p>Questions? Reply to this email or contact Collins Lawncare.</p>
-          <p>&copy; ${new Date().getFullYear()} Collins Lawncare. All rights reserved.</p>
+          <p>Questions? Reply to this email or contact ${bizName}.</p>
+          <p>&copy; ${new Date().getFullYear()} ${bizName}. All rights reserved.</p>
         </div>
       </div>
     `;
 
     const msg = {
       to: customerEmail,
-      from: process.env.SENDGRID_FROM_EMAIL || 'noreply@collinslawncare.com',
-      subject: `Invoice for ${jobName} - Collins Lawncare`,
+      from: fromEmail(),
+      subject: `Invoice for ${jobName} - ${bizName}`,
       html: invoiceHTML,
       trackingSettings: {
         clickTracking: { enabled: true },

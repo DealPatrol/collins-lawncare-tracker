@@ -5,7 +5,7 @@ Firebase project: **`lawncare-72560`**
 | App | Bundle / platform |
 |-----|-------------------|
 | Web | Registered in Firebase Console |
-| iOS | `com.collins.lawncare` |
+| iOS | `com.colecollins.turfroute` (was `com.collins.lawncare`) |
 
 Firestore database: **production mode**, location **nam5**  
 Auth: **Email/Password** enabled
@@ -82,7 +82,7 @@ VITE_FIREBASE_APP_ID=1:123456789:web:abc123
 VITE_FIREBASE_MEASUREMENT_ID=G-XXXXXXXX
 ```
 
-4. **Add an iOS app** with bundle ID `com.collins.lawncare`
+4. **Add an iOS app** with bundle ID `com.colecollins.turfroute`
 5. Download `GoogleService-Info.plist` → place at `ios/App/App/GoogleService-Info.plist`
 
 ---
@@ -99,7 +99,7 @@ npx -y firebase-tools@latest apps:create WEB "Collins Lawncare Web"
 npx -y firebase-tools@latest apps:sdkconfig WEB <WEB_APP_ID>
 
 # iOS app
-npx -y firebase-tools@latest apps:create IOS com.collins.lawncare --bundle-id com.collins.lawncare
+npx -y firebase-tools@latest apps:create IOS "TurfRoute iOS" --bundle-id com.colecollins.turfroute
 npx -y firebase-tools@latest apps:sdkconfig IOS <IOS_APP_ID> > ios/App/App/GoogleService-Info.plist
 ```
 

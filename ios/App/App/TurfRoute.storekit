@@ -1,0 +1,76 @@
+{
+  "identifier": "7C2F9A10",
+  "nonRenewingSubscriptions": [],
+  "products": [],
+  "settings": {
+    "_applicationInternalID": "",
+    "_developerTeamID": "",
+    "_failTransactionsEnabled": false,
+    "_locale": "en_US",
+    "_storefront": "USA",
+    "_storeKitErrors": []
+  },
+  "subscriptionGroups": [
+    {
+      "id": "7C2F9A11",
+      "localizations": [
+        {
+          "description": "Run a whole lawn crew from one phone.",
+          "displayName": "TurfRoute Pro",
+          "locale": "en_US"
+        }
+      ],
+      "name": "TurfRoute Pro",
+      "subscriptions": [
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "79.99",
+          "familyShareable": false,
+          "groupNumber": 1,
+          "internalID": "7C2F9A12",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Unlimited crew profiles, crew invites and the crew leaderboard.",
+              "displayName": "TurfRoute Pro Yearly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.colecollins.turfroute.pro.yearly",
+          "recurringSubscriptionPeriod": "P1Y",
+          "referenceName": "TurfRoute Pro Yearly",
+          "subscriptionGroupID": "7C2F9A11",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        },
+        {
+          "adHocOffers": [],
+          "codeOffers": [],
+          "displayPrice": "9.99",
+          "familyShareable": false,
+          "groupNumber": 2,
+          "internalID": "7C2F9A13",
+          "introductoryOffer": null,
+          "localizations": [
+            {
+              "description": "Unlimited crew profiles, crew invites and the crew leaderboard.",
+              "displayName": "TurfRoute Pro Monthly",
+              "locale": "en_US"
+            }
+          ],
+          "productID": "com.colecollins.turfroute.pro.monthly",
+          "recurringSubscriptionPeriod": "P1M",
+          "referenceName": "TurfRoute Pro Monthly",
+          "subscriptionGroupID": "7C2F9A11",
+          "type": "RecurringSubscription",
+          "winbackOffers": []
+        }
+      ]
+    }
+  ],
+  "version": {
+    "major": 4,
+    "minor": 0
+  }
+}
